@@ -62,6 +62,14 @@ Webbasiertes Tool zur Verwaltung von PDF-Druckfreigaben. Sachbearbeiter laden PD
 
 ## Installation
 
+### Direkt von GitHub (Einzeiler)
+
+```bash
+wget https://github.com/ipod86/PDF-Freigabe/archive/refs/heads/master.tar.gz -O pdf-freigabe.tar.gz && tar -xzf pdf-freigabe.tar.gz && sudo bash PDF-Freigabe-master/setup.sh && rm -rf PDF-Freigabe-master pdf-freigabe.tar.gz
+```
+
+### Manuell (aus heruntergeladenem Archiv)
+
 ```bash
 tar -xzf pdf-freigabe.tar.gz
 cd pdf-freigabe
