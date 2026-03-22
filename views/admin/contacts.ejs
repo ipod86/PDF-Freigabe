@@ -1,0 +1,85 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Ansprechpartner: <%= customer.company %></h1>
+    <p class="page-subtitle">Kontakte für diese Firma verwalten</p>
+  </div>
+  <a href="/admin/customers" class="btn btn-ghost">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    Zurück
+  </a>
+</div>
+
+<div class="card mb-lg">
+  <h3>Neuen Ansprechpartner anlegen</h3>
+  <form method="POST" action="/admin/customers/<%= customer.id %>/contacts" class="inline-form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="form-row">
+      <div class="form-group"><label>Name</label><input type="text" name="name" required placeholder="Anna Beispiel"></div>
+      <div class="form-group"><label>E-Mail</label><input type="email" name="email" required placeholder="anna@firma.de"></div>
+      <div class="form-group"><label>Telefon</label><input type="text" name="phone" placeholder="Optional"></div>
+      <div class="form-group"><label>Position</label><input type="text" name="position" placeholder="Optional"></div>
+      <div class="form-group form-action"><button type="submit" class="btn btn-primary">Anlegen</button></div>
+    </div>
+  </form>
+</div>
+
+<div class="table-wrap">
+  <% if (contacts.length === 0) { %>
+  <div class="empty-state"><p>Noch keine Ansprechpartner angelegt.</p></div>
+  <% } else { %>
+  <table class="data-table">
+    <thead>
+      <tr><th>Name</th><th>E-Mail</th><th>Telefon</th><th>Position</th><th>Status</th><th>Aktionen</th></tr>
+    </thead>
+    <tbody>
+      <% contacts.forEach(c => { %>
+      <tr class="<%= !c.active ? 'row-inactive' : '' %>">
+        <td><strong><%= c.name %></strong></td>
+        <td><%= c.email %></td>
+        <td class="text-muted"><%= c.phone || '–' %></td>
+        <td class="text-muted"><%= c.position || '–' %></td>
+        <td><span class="status-badge <%= c.active ? 'badge-active' : 'badge-inactive' %>"><%= c.active ? 'Aktiv' : 'Inaktiv' %></span></td>
+        <td class="col-actions">
+          <button class="btn-icon" onclick="toggleEdit('co-<%= c.id %>')" title="Bearbeiten">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <form method="POST" action="/admin/contacts/<%= c.id %>/delete" style="display:inline" onsubmit="return confirm('Ansprechpartner löschen?')">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn-icon btn-icon-danger" title="Löschen">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </form>
+        </td>
+      </tr>
+      <tr class="edit-row" id="co-<%= c.id %>" style="display:none">
+        <td colspan="6">
+          <form method="POST" action="/admin/contacts/<%= c.id %>/update" class="inline-form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="customer_id" value="<%= customer.id %>">
+            <div class="form-row">
+              <div class="form-group"><label>Name</label><input type="text" name="name" value="<%= c.name %>" required></div>
+              <div class="form-group"><label>E-Mail</label><input type="email" name="email" value="<%= c.email %>" required></div>
+              <div class="form-group"><label>Telefon</label><input type="text" name="phone" value="<%= c.phone || '' %>"></div>
+              <div class="form-group"><label>Position</label><input type="text" name="position" value="<%= c.position || '' %>"></div>
+              <div class="form-group"><label class="checkbox-label"><input type="checkbox" name="active" <%= c.active ? 'checked' : '' %>> Aktiv</label></div>
+              <div class="form-group form-action"><button type="submit" class="btn btn-primary btn-sm">Speichern</button></div>
+            </div>
+          </form>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</div>
+
+<script>
+function toggleEdit(id) {
+  const row = document.getElementById(id);
+  row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+</script>
+
+<%- include('../partials/footer') %>

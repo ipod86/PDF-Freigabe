@@ -1,0 +1,327 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Neue Freigabe erstellen</h1>
+    <p class="page-subtitle">PDF hochladen und Kunden zur Freigabe einladen</p>
+  </div>
+  <a href="/dashboard" class="btn btn-ghost">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    Zurück
+  </a>
+</div>
+
+<form method="POST" action="/jobs/create" enctype="multipart/form-data" class="create-form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <div class="form-grid">
+    <!-- Linke Spalte -->
+    <div class="form-section">
+      <h3 class="section-title">Auftragsdaten</h3>
+
+      <div class="form-group">
+        <label for="job_name">Auftragsname <span class="required">*</span></label>
+        <input type="text" id="job_name" name="job_name" required placeholder="z.B. Visitenkarten Müller GmbH">
+      </div>
+
+      <div class="form-group">
+        <label for="customer_id">Kunde (Firma) <span class="required">*</span></label>
+        <select id="customer_id" name="customer_id" required>
+          <option value="">– Bitte wählen –</option>
+          <% customers.forEach(c => { %>
+          <option value="<%= c.id %>" data-contacts='<%= JSON.stringify(c.contacts) %>'><%= c.company %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="contact_id">Ansprechpartner <span class="required">*</span></label>
+        <select id="contact_id" name="contact_id" required disabled>
+          <option value="">– Erst Kunde wählen –</option>
+        </select>
+        <small class="form-hint" id="contact_email"></small>
+      </div>
+
+      <div class="form-group">
+        <label for="description">Besonderheiten / Hinweis für Kunden</label>
+        <textarea id="description" name="description" rows="3" placeholder="Sichtbar für den Kunden – z.B. Farbanmerkungen, Sonderformate..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="internal_comment">Interner Kommentar</label>
+        <textarea id="internal_comment" name="internal_comment" rows="2" placeholder="Nur für das Team sichtbar – z.B. Frist, Besonderheiten..."></textarea>
+      </div>
+
+      <div class="form-row-2">
+        <div class="form-group">
+          <label for="due_date">Fälligkeitsdatum</label>
+          <input type="date" id="due_date" name="due_date">
+          <small class="form-hint">Wird dem Kunden angezeigt und im Dashboard hervorgehoben.</small>
+        </div>
+        <div class="form-group">
+          <label for="followup_date">Wiedervorlage</label>
+          <input type="date" id="followup_date" name="followup_date">
+          <small class="form-hint">Persönliche Erinnerung im Dashboard.</small>
+        </div>
+      </div>
+
+      <div class="form-group" id="followupNoteGroup" style="display:none;">
+        <label for="followup_note">Wiedervorlage-Notiz</label>
+        <input type="text" id="followup_note" name="followup_note" placeholder="z.B. Kunde nochmal anrufen">
+      </div>
+
+      <script>
+      document.getElementById('followup_date').addEventListener('change', function() {
+        document.getElementById('followupNoteGroup').style.display = this.value ? 'block' : 'none';
+      });
+      </script>
+
+      <div class="form-group">
+        <label>Sichtbarkeit</label>
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" name="visibility" value="team" checked>
+            <span class="radio-text">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              Team-Sichtbarkeit
+            </span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="visibility" value="private">
+            <span class="radio-text">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Nur für mich
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>E-Mail-Benachrichtigungen</label>
+        <div class="checkbox-group" style="display:flex;flex-direction:column;gap:8px;">
+          <label class="checkbox-label" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
+            <input type="checkbox" name="email_customer" value="1" checked id="emailCustomer" onchange="updateEmailHints()">
+            <span>
+              <strong>E-Mail an Kunden</strong><br>
+              <small class="text-muted">Kunde erhält Freigabe-Link, Erinnerungen und Bestätigungen</small>
+            </span>
+          </label>
+          <div id="hintNoCustomer" class="email-hint email-hint-warn" style="display:none;">
+            ⚠️ Der Kunde bekommt keine Einladung zur Freigabe und keine automatischen Erinnerungen. Teilen Sie den Link manuell.
+          </div>
+          <label class="checkbox-label" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
+            <input type="checkbox" name="email_creator" value="1" checked id="emailCreator" onchange="updateEmailHints()">
+            <span>
+              <strong>E-Mail an Sachbearbeiter</strong><br>
+              <small class="text-muted">Sie erhalten Benachrichtigungen bei Freigabe/Ablehnung</small>
+            </span>
+          </label>
+          <div id="hintNoCreator" class="email-hint email-hint-info" style="display:none;">
+            ℹ️ Sie erhalten keine E-Mail-Benachrichtigungen bei Statusänderungen dieser Freigabe.
+          </div>
+          <label class="checkbox-label" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;" id="reminderLabel">
+            <input type="checkbox" name="no_reminder" value="1" id="noReminder">
+            <span>
+              <strong>Keine automatischen Erinnerungen</strong><br>
+              <small class="text-muted">Deaktiviert das automatische Mahnwesen für diese Freigabe</small>
+            </span>
+          </label>
+        </div>
+      </div>
+      <script>
+      function updateEmailHints() {
+        document.getElementById('hintNoCustomer').style.display = document.getElementById('emailCustomer').checked ? 'none' : 'block';
+        document.getElementById('hintNoCreator').style.display = document.getElementById('emailCreator').checked ? 'none' : 'block';
+        var rl = document.getElementById('reminderLabel');
+        if (!document.getElementById('emailCustomer').checked) {
+          rl.style.opacity='0.5'; document.getElementById('noReminder').checked = true; document.getElementById('noReminder').disabled = true;
+        } else {
+          rl.style.opacity='1'; document.getElementById('noReminder').disabled = false;
+        }
+      }
+      </script>
+
+      <div class="form-group">
+        <label for="access_password">Passwortschutz (optional)</label>
+        <input type="text" id="access_password" name="access_password" placeholder="Leer = kein Passwort nötig">
+        <small class="form-hint">Wenn gesetzt, muss der Kunde dieses Passwort eingeben, bevor er die Freigabe sehen kann.</small>
+      </div>
+    </div>
+
+    <!-- Rechte Spalte -->
+    <div class="form-section">
+      <h3 class="section-title">PDF-Dateien</h3>
+
+      <div class="upload-area" id="uploadArea">
+        <input type="file" id="pdfs" name="pdfs" accept="application/pdf" required multiple class="upload-input">
+        <div class="upload-placeholder" id="uploadPlaceholder">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <polyline points="9 15 12 12 15 15"/>
+          </svg>
+          <p class="upload-text">PDF-Dateien hierher ziehen</p>
+          <p class="upload-hint">Eine oder mehrere PDFs auswählen (max. 50 MB je Datei)</p>
+        </div>
+        <div class="upload-file-list" id="uploadFileList" style="display:none;"></div>
+      </div>
+
+      <div class="form-info-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <div>
+          <strong>So funktioniert's:</strong>
+          <p>Nach dem Erstellen erhält der Ansprechpartner automatisch eine E-Mail mit einem persönlichen Link. Über diesen Link kann er das PDF prüfen, freigeben oder ablehnen.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <a href="/dashboard" class="btn btn-ghost">Abbrechen</a>
+    <button type="submit" class="btn btn-primary" id="submitBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      Freigabe erstellen & senden
+    </button>
+  </div>
+</form>
+
+<script>
+// Kunden → Kontakte Dropdown
+document.getElementById('customer_id').addEventListener('change', function() {
+  const contactSelect = document.getElementById('contact_id');
+  const emailHint = document.getElementById('contact_email');
+  contactSelect.innerHTML = '<option value="">– Bitte wählen –</option>';
+  emailHint.textContent = '';
+
+  if (!this.value) {
+    contactSelect.disabled = true;
+    return;
+  }
+
+  const option = this.options[this.selectedIndex];
+  const contacts = JSON.parse(option.dataset.contacts || '[]');
+
+  contacts.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    opt.dataset.email = c.email;
+    contactSelect.appendChild(opt);
+  });
+
+  contactSelect.disabled = contacts.length === 0;
+  if (contacts.length === 0) {
+    contactSelect.innerHTML = '<option value="">Keine Ansprechpartner vorhanden</option>';
+  }
+});
+
+document.getElementById('contact_id').addEventListener('change', function() {
+  const emailHint = document.getElementById('contact_email');
+  const opt = this.options[this.selectedIndex];
+  emailHint.textContent = opt && opt.dataset.email ? 'E-Mail: ' + opt.dataset.email : '';
+});
+
+// Drag & Drop Upload (Multi-File, akkumulierend)
+const uploadArea = document.getElementById('uploadArea');
+const fileInput = document.getElementById('pdfs');
+const placeholder = document.getElementById('uploadPlaceholder');
+const fileList = document.getElementById('uploadFileList');
+
+// Gesammelte Dateien (DataTransfer erlaubt Akkumulierung)
+let collectedFiles = new DataTransfer();
+
+function syncInput() {
+  fileInput.files = collectedFiles.files;
+}
+
+function renderFileList() {
+  const files = collectedFiles.files;
+  if (files.length === 0) {
+    placeholder.style.display = '';
+    fileList.style.display = 'none';
+    uploadArea.classList.remove('has-file');
+    fileInput.style.display = '';  // Unsichtbaren Input wieder aktivieren
+    return;
+  }
+  placeholder.style.display = 'none';
+  fileList.style.display = 'block';
+  uploadArea.classList.add('has-file');
+  fileInput.style.display = 'none';  // WICHTIG: Input verstecken damit Klicks auf Buttons gehen
+
+  let html = '<div class="file-count">' + files.length + ' Datei' + (files.length > 1 ? 'en' : '') + ' ausgewählt</div>';
+  for (let i = 0; i < files.length; i++) {
+    html += '<div class="file-entry">' +
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
+      '<span class="file-entry-name">' + files[i].name + '</span>' +
+      '<span class="file-entry-size">' + (files[i].size / 1024 / 1024).toFixed(2) + ' MB</span>' +
+      '<button type="button" class="file-remove-btn" data-remove="' + i + '" title="Entfernen">&times;</button>' +
+      '</div>';
+  }
+  html += '<div style="display:flex;gap:8px;margin-top:10px;">';
+  html += '<label class="btn btn-ghost btn-sm" style="cursor:pointer;flex:1;justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Weitere hinzufügen<input type="file" accept="application/pdf" multiple style="display:none;" id="addMoreFiles"></label>';
+  html += '<button type="button" class="btn btn-ghost btn-sm" id="clearAllFiles">Alle entfernen</button>';
+  html += '</div>';
+  fileList.innerHTML = html;
+
+  // Event: Einzelne Datei entfernen
+  fileList.querySelectorAll('[data-remove]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.remove);
+      const newDt = new DataTransfer();
+      for (let i = 0; i < collectedFiles.files.length; i++) {
+        if (i !== idx) newDt.items.add(collectedFiles.files[i]);
+      }
+      collectedFiles = newDt;
+      syncInput();
+      renderFileList();
+    });
+  });
+
+  // Event: Weitere Dateien hinzufügen
+  document.getElementById('addMoreFiles')?.addEventListener('change', (e) => {
+    for (const f of e.target.files) {
+      if (f.type === 'application/pdf') collectedFiles.items.add(f);
+    }
+    syncInput();
+    renderFileList();
+  });
+
+  // Event: Alle entfernen
+  document.getElementById('clearAllFiles')?.addEventListener('click', () => {
+    collectedFiles = new DataTransfer();
+    syncInput();
+    renderFileList();
+  });
+}
+
+// Dateiauswahl über den nativen Input
+fileInput.addEventListener('change', () => {
+  for (const f of fileInput.files) {
+    collectedFiles.items.add(f);
+  }
+  syncInput();
+  renderFileList();
+});
+
+// Drag & Drop
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadArea.classList.remove('drag-over');
+  for (const f of e.dataTransfer.files) {
+    if (f.type === 'application/pdf') collectedFiles.items.add(f);
+  }
+  syncInput();
+  renderFileList();
+});
+
+// Doppel-Submit verhindern
+document.querySelector('.create-form').addEventListener('submit', function() {
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Wird erstellt...';
+});
+</script>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <% if (typeof companyLogo !== 'undefined' && companyLogo) { %><link rel="icon" href="/uploads/logo/<%= companyLogo %>"><% } else { %><link rel="icon" type="image/svg+xml" href="/img/favicon.svg"><% } %>
+  <link rel="stylesheet" href="/css/fonts.css?v=<%= typeof v !== 'undefined' ? v : '1' %>">
+  <link rel="stylesheet" href="/css/style.css?v=<%= typeof v !== 'undefined' ? v : '1' %>">
+  <link rel="stylesheet" href="/css/approve.css?v=<%= typeof v !== 'undefined' ? v : '1' %>">
+  <style>
+    :root { --accent: <%= primaryColor %>; }
+    .approve-header { background: var(--accent); }
+    .imprint-content { max-width: 720px; margin: 0 auto; padding: 40px 24px 60px; line-height: 1.8; }
+    .imprint-content h1 { font-size: 1.6rem; margin-bottom: 8px; }
+    .imprint-content h2 { font-size: 1.15rem; margin-top: 28px; margin-bottom: 8px; color: var(--text); }
+    .imprint-content p { font-size: 0.92rem; color: var(--text-secondary); }
+    .imprint-content a { color: var(--accent); }
+    .imprint-empty { text-align: center; padding: 60px 24px; color: var(--text-muted); }
+  </style>
+</head>
+<body class="approve-body">
+  <header class="approve-header">
+    <div class="approve-brand">
+      <% if (companyLogo) { %>
+      <img src="/uploads/logo/<%= companyLogo %>" alt="<%= companyName %>" style="max-height:32px;">
+      <% } else { %>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <% } %>
+      <span><%= companyName %></span>
+    </div>
+  </header>
+
+  <main class="imprint-content">
+    <% if (imprintText) { %>
+    <%- imprintText %>
+    <% } else { %>
+    <div class="imprint-empty">
+      <h1>Impressum</h1>
+      <p>Das Impressum wurde noch nicht konfiguriert.</p>
+      <p>Bitte kontaktieren Sie den Betreiber dieses Tools.</p>
+    </div>
+    <% } %>
+  </main>
+
+  <footer class="approve-footer">
+    <p><a href="/" style="color:inherit;text-decoration:underline;">Startseite</a> · <a href="/datenschutz" style="color:inherit;text-decoration:underline;">Datenschutz</a> · &copy; <%= new Date().getFullYear() %> <%= companyName %></p>
+  </footer>
+</body>
+</html>

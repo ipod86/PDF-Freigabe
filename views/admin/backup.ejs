@@ -1,0 +1,71 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Backup & Wiederherstellung</h1>
+    <p class="page-subtitle">Komplettes System sichern und wiederherstellen</p>
+  </div>
+</div>
+
+<div class="backup-grid">
+  <!-- Backup erstellen -->
+  <div class="card">
+    <h3>Komplettes Backup erstellen</h3>
+    <p class="text-muted" style="margin:8px 0 16px;font-size:0.88rem;">
+      Erstellt ein einzelnes Archiv mit der <strong>Datenbank</strong> (alle Jobs, Kunden, Benutzer, Einstellungen, Audit-Logs) und <strong>allen PDF-Dateien</strong>.
+    </p>
+    <a href="/admin/backup/download" class="btn btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Komplett-Backup herunterladen
+    </a>
+    <div class="backup-stats">
+      <div class="backup-stat">
+        <strong><%= stats.dbSize %></strong>
+        <small>Datenbank</small>
+      </div>
+      <div class="backup-stat">
+        <strong><%= stats.uploadsSize %></strong>
+        <small><%= stats.uploadCount %> PDFs</small>
+      </div>
+      <div class="backup-stat">
+        <strong><%= stats.jobs %></strong>
+        <small>Freigaben</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wiederherstellen -->
+  <div class="card">
+    <h3>Backup wiederherstellen</h3>
+    <p class="text-muted" style="margin:8px 0 16px;font-size:0.88rem;">
+      Laden Sie ein zuvor erstelltes Komplett-Backup (.tar.gz) hoch. <strong style="color:var(--red);">Alle aktuellen Daten und PDFs werden durch das Backup ersetzt!</strong>
+    </p>
+    <form method="POST" action="/admin/backup/restore" enctype="multipart/form-data" onsubmit="return confirm('ACHTUNG: Alle aktuellen Daten und PDFs werden überschrieben!\n\nDieser Vorgang kann nicht rückgängig gemacht werden.\n\nFortfahren?')">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="form-group">
+        <label>Backup-Archiv (.tar.gz)</label>
+        <input type="file" name="backup" accept=".tar.gz,.tgz" required class="version-input">
+      </div>
+      <button type="submit" class="btn btn-danger">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        Backup wiederherstellen
+      </button>
+    </form>
+
+    <div class="form-info-box" style="margin-top:16px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      <div>Nach der Wiederherstellung wird der Server automatisch neu gestartet. Dieser Vorgang kann einige Sekunden dauern.</div>
+    </div>
+  </div>
+</div>
+
+<style>
+.backup-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.backup-stats { display:flex; gap:16px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border-light); }
+.backup-stat { text-align:center; flex:1; }
+.backup-stat strong { display:block; font-size:1.2rem; color:var(--text); }
+.backup-stat small { color:var(--text-muted); font-size:0.78rem; }
+@media (max-width:768px) { .backup-grid { grid-template-columns:1fr; } }
+</style>
+
+<%- include('../partials/footer') %>

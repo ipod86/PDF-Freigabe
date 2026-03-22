@@ -1,0 +1,219 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Einstellungen</h1>
+    <p class="page-subtitle">Firma, E-Mail-Server, System-Konfiguration</p>
+  </div>
+</div>
+
+<form method="POST" action="/admin/settings" enctype="multipart/form-data">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+  <!-- Unternehmen -->
+  <div class="card mb-lg">
+    <h3>Unternehmen</h3>
+    <div class="settings-row">
+      <div class="form-group flex-2">
+        <label for="company_name">Firmenname</label>
+        <input type="text" id="company_name" name="company_name" value="<%= settings.company_name || '' %>" placeholder="Meine Firma GmbH">
+        <small class="form-hint">Wird in E-Mails und auf der Kunden-Seite angezeigt.</small>
+      </div>
+      <div class="form-group">
+        <label for="base_url">Base-URL</label>
+        <input type="text" id="base_url" name="base_url" value="<%= settings.base_url || '' %>" placeholder="https://freigabe.meinefirma.de">
+        <small class="form-hint">Basis-URL für Freigabe-Links in E-Mails. Leer = automatisch.</small>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Firmenlogo</label>
+      <div class="logo-upload-area">
+        <% if (settings.company_logo) { %>
+        <div class="logo-preview">
+          <img src="/uploads/logo/<%= settings.company_logo %>" alt="Logo" style="max-height:60px;max-width:200px;">
+          <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
+            Ändern <input type="file" name="logo" accept="image/png,image/jpeg,image/svg+xml" style="display:none;" onchange="this.form.submit()">
+          </label>
+        </div>
+        <% } else { %>
+        <label class="logo-placeholder" style="cursor:pointer;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <span>Logo hochladen (PNG, JPG, SVG)</span>
+          <input type="file" name="logo" accept="image/png,image/jpeg,image/svg+xml" style="display:none;" onchange="this.form.submit()">
+        </label>
+        <% } %>
+      </div>
+      <small class="form-hint">Wird auf der Kunden-Seite und in E-Mails angezeigt.</small>
+    </div>
+
+    <div class="form-group">
+      <label>Firmenfarben (Kunden-Freigabeseite)</label>
+      <div class="settings-row">
+        <div class="form-group" style="margin-bottom:0;">
+          <label for="primary_color" style="font-size:0.82rem;">Primärfarbe</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="color" id="primary_color" name="primary_color" value="<%= settings.primary_color || '#4361ee' %>" style="width:44px;height:36px;border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;">
+            <input type="text" value="<%= settings.primary_color || '#4361ee' %>" style="width:90px;font-family:var(--font-mono);font-size:0.82rem;" onchange="document.getElementById('primary_color').value=this.value" id="primary_color_text">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label for="accent_color" style="font-size:0.82rem;">Akzentfarbe (Buttons)</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="color" id="accent_color" name="accent_color" value="<%= settings.accent_color || '#2563eb' %>" style="width:44px;height:36px;border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;">
+            <input type="text" value="<%= settings.accent_color || '#2563eb' %>" style="width:90px;font-family:var(--font-mono);font-size:0.82rem;" onchange="document.getElementById('accent_color').value=this.value" id="accent_color_text">
+          </div>
+        </div>
+      </div>
+      <small class="form-hint">Farben werden auf der Kunden-Freigabeseite als Hauptfarbe für Buttons und Links verwendet.</small>
+    </div>
+  </div>
+
+  <script>
+  document.getElementById('primary_color').addEventListener('input', e => document.getElementById('primary_color_text').value = e.target.value);
+  document.getElementById('accent_color').addEventListener('input', e => document.getElementById('accent_color_text').value = e.target.value);
+  </script>
+
+  <!-- SMTP -->
+  <div class="card mb-lg">
+    <h3>E-Mail-Server (SMTP)</h3>
+    <div class="settings-row">
+      <div class="form-group">
+        <label for="smtp_host">SMTP-Host</label>
+        <input type="text" id="smtp_host" name="smtp_host" value="<%= settings.smtp_host || '' %>" placeholder="smtp.example.com">
+      </div>
+      <div class="form-group">
+        <label for="smtp_port">SMTP-Port</label>
+        <input type="number" id="smtp_port" name="smtp_port" value="<%= settings.smtp_port || '587' %>" placeholder="587">
+        <small class="form-hint">587 (STARTTLS), 465 (SSL), 25 (lokal)</small>
+      </div>
+    </div>
+    <div class="settings-row">
+      <div class="form-group">
+        <label for="smtp_user">SMTP-Benutzer</label>
+        <input type="text" id="smtp_user" name="smtp_user" value="<%= settings.smtp_user || '' %>" placeholder="Leer = keine Auth">
+      </div>
+      <div class="form-group">
+        <label for="smtp_pass">SMTP-Passwort</label>
+        <input type="password" id="smtp_pass" name="smtp_pass" value="<%= settings.smtp_pass || '' %>">
+      </div>
+    </div>
+    <div class="settings-row">
+      <div class="form-group">
+        <label for="smtp_from">Absender-Adresse</label>
+        <input type="email" id="smtp_from" name="smtp_from" value="<%= settings.smtp_from || '' %>" placeholder="freigabe@meinefirma.de">
+      </div>
+      <div class="form-group">
+        <label for="smtp_from_name">Absender-Name</label>
+        <input type="text" id="smtp_from_name" name="smtp_from_name" value="<%= settings.smtp_from_name || '' %>" placeholder="PDF-Freigabe">
+      </div>
+    </div>
+
+    <!-- Email-Test direkt hier -->
+    <div class="email-test-inline">
+      <h4>Testmail versenden</h4>
+      <div class="settings-row" style="align-items:flex-end;">
+        <div class="form-group flex-2" style="margin-bottom:0;">
+          <input type="email" id="test_recipient" placeholder="test@example.com" value="<%= user.email %>">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="sendTestMail()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            Testmail senden
+          </button>
+        </div>
+      </div>
+      <div id="testResult" style="display:none;margin-top:8px;font-size:0.85rem;"></div>
+    </div>
+  </div>
+
+  <!-- Erinnerungen -->
+  <div class="card mb-lg">
+    <h3>Automatische Erinnerungen</h3>
+    <div class="settings-row">
+      <div class="form-group">
+        <label for="reminder_days">Erinnerung nach (Tagen)</label>
+        <input type="number" id="reminder_days" name="reminder_days" value="<%= settings.reminder_days || 3 %>" min="1" max="30">
+      </div>
+      <div class="form-group">
+        <label for="max_reminders">Maximale Erinnerungen</label>
+        <input type="number" id="max_reminders" name="max_reminders" value="<%= settings.max_reminders || 3 %>" min="1" max="10">
+      </div>
+    </div>
+  </div>
+
+  <!-- Datenschutzerklärung -->
+  <div class="card mb-lg">
+    <h3>Datenschutzerklärung</h3>
+    <p class="text-muted" style="margin-bottom:12px;font-size:0.85rem;">
+      Wird auf der öffentlichen Seite <a href="/datenschutz" target="_blank">/datenschutz</a> angezeigt und in E-Mails verlinkt. HTML möglich.
+    </p>
+    <div class="form-group">
+      <textarea id="privacy_policy" name="privacy_policy" rows="14" class="code-editor" style="font-size:0.82rem;"><%= settings.privacy_policy || '' %></textarea>
+    </div>
+    <div class="form-group">
+      <label>Vorschau</label>
+      <div id="privacyPreview" style="border:1px solid var(--border);border-radius:var(--radius);padding:20px;max-height:300px;overflow-y:auto;font-size:0.88rem;line-height:1.7;"></div>
+    </div>
+  </div>
+
+  <!-- Impressum -->
+  <div class="card mb-lg">
+    <h3>Impressum</h3>
+    <p class="text-muted" style="margin-bottom:12px;font-size:0.85rem;">
+      Wird auf der öffentlichen Seite <a href="/impressum" target="_blank">/impressum</a> angezeigt. Pflichtangaben gemäß § 5 DDG. HTML möglich.
+    </p>
+    <div class="form-group">
+      <textarea id="imprint" name="imprint" rows="14" class="code-editor" style="font-size:0.82rem;"><%= settings.imprint || '' %></textarea>
+    </div>
+    <div class="form-group">
+      <label>Vorschau</label>
+      <div id="imprintPreview" style="border:1px solid var(--border);border-radius:var(--radius);padding:20px;max-height:300px;overflow-y:auto;font-size:0.88rem;line-height:1.7;"></div>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Einstellungen speichern</button>
+  </div>
+</form>
+
+<script>
+const ppEditor = document.getElementById('privacy_policy');
+const ppPreview = document.getElementById('privacyPreview');
+function updatePrivacyPreview() { ppPreview.innerHTML = ppEditor.value; }
+ppEditor.addEventListener('input', updatePrivacyPreview);
+updatePrivacyPreview();
+
+const imEditor = document.getElementById('imprint');
+const imPreview = document.getElementById('imprintPreview');
+function updateImprintPreview() { imPreview.innerHTML = imEditor.value; }
+imEditor.addEventListener('input', updateImprintPreview);
+updateImprintPreview();
+</script>
+
+<style>
+.settings-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.logo-upload-area { margin-top:4px; }
+.logo-preview { display:flex; align-items:center; gap:16px; padding:12px; background:var(--bg); border-radius:var(--radius); border:1px solid var(--border); }
+.logo-placeholder { display:flex; align-items:center; gap:12px; padding:16px; border:2px dashed var(--border); border-radius:var(--radius); color:var(--text-muted); font-size:0.88rem; }
+.logo-placeholder:hover { border-color:var(--accent); color:var(--accent); }
+.email-test-inline { margin-top:20px; padding-top:20px; border-top:1px solid var(--border-light); }
+.email-test-inline h4 { font-size:0.85rem; font-weight:600; color:var(--text-secondary); margin-bottom:10px; }
+@media (max-width:768px) { .settings-row { grid-template-columns:1fr; } }
+</style>
+
+<script>
+async function sendTestMail() {
+  const recipient = document.getElementById('test_recipient').value;
+  const result = document.getElementById('testResult');
+  if (!recipient) { result.style.display='block'; result.innerHTML='<span style="color:var(--red)">Empfänger eingeben</span>'; return; }
+  result.style.display='block'; result.innerHTML='<span style="color:var(--text-muted)">Wird gesendet...</span>';
+  try {
+    const res = await csrfFetch('/api/email-test', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({recipient}) });
+    const data = await res.json();
+    if (data.success) result.innerHTML='<span style="color:var(--green)">✓ Testmail gesendet!</span>';
+    else result.innerHTML='<span style="color:var(--red)">✗ ' + (data.error||'Fehler') + '</span>';
+  } catch(e) { result.innerHTML='<span style="color:var(--red)">Verbindungsfehler</span>'; }
+}
+</script>
+
+<%- include('../partials/footer') %>

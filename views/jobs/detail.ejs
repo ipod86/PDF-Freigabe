@@ -1,0 +1,396 @@
+<%- include('../partials/header') %>
+
+<% const isMultiFile = files && files.length > 1; %>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <span class="status-dot status-<%= job.status %> dot-lg"></span>
+      <%= job.job_name %>
+      <% if (job.current_version > 1) { %><span class="version-badge">V<%= job.current_version %></span><% } %>
+      <% if (isMultiFile) { %><span class="version-badge" style="background:var(--accent-soft);color:var(--accent);"><%= files.length %> PDFs</span><% } %>
+    </h1>
+    <p class="page-subtitle"><%= job.customer_company %> – <%= job.contact_name %></p>
+  </div>
+  <div class="header-actions">
+    <a href="/dashboard" class="btn btn-ghost">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      Zurück
+    </a>
+  </div>
+</div>
+
+<div class="detail-grid">
+  <!-- ═══ HAUPTBEREICH ═══ -->
+  <div class="detail-main">
+    <!-- Status-Banner -->
+    <div class="status-banner status-banner-<%= job.status %>">
+      <% if (job.status === 'pending') { %>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>Warten auf Kunden-Rückmeldung</span>
+        <% if (job.reminder_count > 0) { %><small>(<%= job.reminder_count %> Erinnerung(en))</small><% } %>
+      <% } else if (job.status === 'approved') { %>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <span>Freigegeben am <%= job.status_changed_at ? new Date(job.status_changed_at).toLocaleString('de-DE') : '' %></span>
+      <% } else { %>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        <span>Abgelehnt am <%= job.status_changed_at ? new Date(job.status_changed_at).toLocaleString('de-DE') : '' %></span>
+      <% } %>
+    </div>
+
+    <% if (job.customer_comment) { %>
+    <div class="comment-box">
+      <strong>Kunden-Kommentar:</strong>
+      <p><%= job.customer_comment %></p>
+    </div>
+    <% } %>
+
+    <% if (isMultiFile) { %>
+    <!-- ═══ ALLE PDFs ANZEIGEN (Multi-File) ═══ -->
+    <% files.forEach((f, i) => { %>
+    <div class="pdf-card pdf-card-<%= f.status %>">
+      <div class="pdf-card-header">
+        <span class="pdf-card-num"><%= i + 1 %></span>
+        <strong><%= f.original_name %></strong>
+        <span class="pdf-card-size"><%= (f.file_size / 1024).toFixed(0) %> KB</span>
+        <span class="mf-status mf-status-<%= f.status %>">
+          <%= f.status === 'approved' ? '✓ Freigegeben' : f.status === 'rejected' ? '✗ Abgelehnt' : '⏳ Offen' %>
+        </span>
+        <a href="/jobs/<%= job.uuid %>/file/<%= f.id %>/download" class="btn btn-ghost btn-sm" style="margin-left:auto;" title="Herunterladen">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </a>
+      </div>
+      <% if (f.customer_comment) { %>
+      <div class="pdf-card-comment">"<%= f.customer_comment %>"</div>
+      <% } %>
+      <iframe src="/jobs/<%= job.uuid %>/file/<%= f.id %>/preview" class="pdf-frame" style="height:400px;"></iframe>
+    </div>
+    <% }) %>
+    <% } else { %>
+    <!-- ═══ EINZELNES PDF (Standard) ═══ -->
+    <div class="pdf-viewer">
+      <div class="pdf-toolbar">
+        <span class="pdf-filename"><%= versions[0] ? versions[0].original_name : 'Dokument' %></span>
+        <a href="/jobs/<%= job.uuid %>/download" class="btn btn-ghost btn-sm">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Herunterladen
+        </a>
+      </div>
+      <iframe src="/jobs/<%= job.uuid %>/preview" class="pdf-frame"></iframe>
+    </div>
+    <% } %>
+
+    <!-- Neue Version -->
+    <% if (job.status === 'rejected' || job.status === 'pending') { %>
+    <div class="new-version-cta">
+      <a href="/jobs/<%= job.uuid %>/version" class="btn btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Version <%= job.current_version + 1 %> erstellen
+      </a>
+      <% if (job.customer_comment) { %>
+      <p class="text-muted" style="font-size:0.85rem;margin-top:8px;">
+        <strong>Kunden-Feedback:</strong> "<%= job.customer_comment %>"
+      </p>
+      <% } %>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- ═══ SEITENLEISTE ═══ -->
+  <div class="detail-sidebar">
+
+    <!-- 1. Details -->
+    <div class="sidebar-card">
+      <h4>Details</h4>
+      <dl class="info-list">
+        <dt>Ersteller</dt><dd><%= job.creator_name %></dd>
+        <dt>Kunde</dt><dd><%= job.customer_company %></dd>
+        <dt>Ansprechpartner</dt><dd><%= job.contact_name %><br><small><%= job.contact_email %></small></dd>
+        <dt>Erstellt am</dt><dd><%= new Date(job.created_at).toLocaleString('de-DE') %></dd>
+        <dt>Sichtbarkeit</dt><dd><%= job.visibility === 'team' ? 'Team' : 'Privat' %></dd>
+        <dt>Kunden-Link</dt>
+        <dd><input type="text" class="copy-input" value="<%= baseUrl %>/approve/<%= job.access_token %>" readonly onclick="this.select(); navigator.clipboard.writeText(this.value);"></dd>
+        <% if (job.access_password) { %>
+        <dt>Passwort</dt>
+        <dd><code style="background:var(--bg);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);user-select:all;"><%= job.access_password %></code></dd>
+        <% } %>
+        <dt>Mail an Kunde</dt><dd><%= job.email_customer ? 'Ja' : 'Nein (manueller Link)' %></dd>
+        <dt>Mail an Sachbearbeiter</dt><dd><%= job.email_creator ? 'Ja' : 'Nein' %></dd>
+        <% if (job.no_reminder) { %><dt>Erinnerungen</dt><dd>Deaktiviert</dd><% } %>
+        <% if (job.due_date) { %>
+        <dt>Fällig bis</dt>
+        <dd>
+          <%
+            const dueD = new Date(job.due_date); dueD.setHours(0,0,0,0);
+            const nowD = new Date(); nowD.setHours(0,0,0,0);
+            const overdue = dueD < nowD && job.status === 'pending';
+          %>
+          <span class="due-badge <%= overdue ? 'due-overdue' : '' %>"><%= dueD.toLocaleDateString('de-DE') %></span>
+          <% if (overdue) { %><small style="color:var(--red);margin-left:4px;">überfällig</small><% } %>
+        </dd>
+        <% } %>
+        <% if (job.followup_date) { %>
+        <dt>Wiedervorlage</dt>
+        <dd>
+          <%= new Date(job.followup_date).toLocaleDateString('de-DE') %>
+          <% if (job.followup_note) { %><br><small class="text-muted"><%= job.followup_note %></small><% } %>
+        </dd>
+        <% } %>
+      </dl>
+    </div>
+
+    <% if (!job.email_customer) { %>
+    <div class="sidebar-card" style="border-left:3px solid var(--accent);">
+      <h4>Link manuell teilen</h4>
+      <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px;">Keine Kunden-Mail versendet.</p>
+      <input type="text" class="copy-input" value="<%= baseUrl %>/approve/<%= job.access_token %>" readonly onclick="this.select(); navigator.clipboard.writeText(this.value);" style="font-size:0.78rem;">
+      <% if (job.access_password) { %><p style="font-size:0.82rem;color:var(--text-muted);margin-top:8px;">Passwort: <strong><%= job.access_password %></strong></p><% } %>
+    </div>
+    <% } %>
+
+    <!-- 2. Einzeldateien (direkt nach Details) -->
+    <% if (files && files.length > 0) { %>
+    <div class="sidebar-card">
+      <h4>Dateien (<%= files.length %>)</h4>
+      <div class="file-list">
+        <% files.forEach((f, i) => { %>
+        <div class="file-item file-<%= f.status %>">
+          <div class="file-status"><span class="status-dot status-<%= f.status %>"></span></div>
+          <div class="file-info">
+            <strong><%= f.original_name %></strong>
+            <small class="text-muted"><%= (f.file_size / 1024).toFixed(0) %> KB · <%= f.status === 'approved' ? 'Freigegeben' : f.status === 'rejected' ? 'Abgelehnt' : 'Offen' %></small>
+            <% if (f.customer_comment) { %><small class="text-muted">"<%= f.customer_comment %>"</small><% } %>
+          </div>
+        </div>
+        <% }) %>
+      </div>
+      <!-- Weitere Dateien hinzufügen -->
+      <form method="POST" action="/jobs/<%= job.uuid %>/files" enctype="multipart/form-data" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-light);">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="file" name="pdfs" accept="application/pdf" multiple class="version-input" style="margin-bottom:6px;font-size:0.82rem;">
+        <button type="submit" class="btn btn-ghost btn-sm btn-full">Weitere Dateien hinzufügen</button>
+      </form>
+    </div>
+    <% } %>
+
+    <!-- 3. Besonderheiten -->
+    <% if (job.description) { %>
+    <div class="sidebar-card">
+      <h4>Besonderheiten</h4>
+      <p><%= job.description %></p>
+    </div>
+    <% } %>
+
+    <% if (job.internal_comment) { %>
+    <div class="sidebar-card card-internal">
+      <h4>Interner Kommentar</h4>
+      <p><%= job.internal_comment %></p>
+    </div>
+    <% } %>
+
+    <!-- 4. Versionen -->
+    <div class="sidebar-card">
+      <h4>Versionshistorie</h4>
+      <div class="version-list">
+        <% versions.forEach(v => { %>
+        <div class="version-block">
+          <div class="version-item <%= v.version_number === job.current_version ? 'version-current' : '' %>" onclick="toggleVersionFiles(<%= v.version_number %>)" style="cursor:pointer;">
+            <div class="version-info">
+              <strong>V<%= v.version_number %></strong>
+              <% const vf = (typeof allFiles !== 'undefined' && allFiles[v.version_number]) ? allFiles[v.version_number] : []; %>
+              <% if (vf.length > 1) { %><small><%= vf.length %> Dateien</small><% } else { %><small><%= v.original_name %></small><% } %>
+              <small class="text-muted"><%= new Date(v.created_at).toLocaleString('de-DE') %> – <%= v.uploaded_by_name %></small>
+            </div>
+            <svg class="version-chevron" id="chevron-<%= v.version_number %>" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;transition:transform 0.2s;"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="version-files" id="version-files-<%= v.version_number %>" style="display:none;">
+            <% if (vf.length > 0) { vf.forEach(f => { %>
+            <div class="vf-item vf-<%= f.status %>">
+              <span class="status-dot status-<%= f.status %>" style="flex-shrink:0;"></span>
+              <div class="vf-info">
+                <span><%= f.original_name %></span>
+                <small class="text-muted"><%= (f.file_size / 1024).toFixed(0) %> KB · <%= f.status === 'approved' ? 'Freigegeben' : f.status === 'rejected' ? 'Abgelehnt' : 'Offen' %></small>
+                <% if (f.customer_comment) { %><small class="text-muted" style="font-style:italic;">"<%= f.customer_comment %>"</small><% } %>
+              </div>
+              <a href="/jobs/<%= job.uuid %>/file/<%= f.id %>/download" class="btn-icon" title="Download" style="flex-shrink:0;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </a>
+            </div>
+            <% }); } else { %>
+            <div class="vf-item">
+              <a href="/jobs/<%= job.uuid %>/download/<%= v.version_number %>" class="btn-icon" title="Download V<%= v.version_number %>">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </a>
+              <span><%= v.original_name %></span>
+            </div>
+            <% } %>
+          </div>
+        </div>
+        <% }) %>
+      </div>
+    </div>
+
+    <!-- 5. Audit-Log -->
+    <div class="sidebar-card">
+      <h4>Aktivitätsprotokoll</h4>
+      <div class="audit-log">
+        <% logs.forEach(log => { %>
+        <div class="audit-entry">
+          <div class="audit-dot audit-<%= log.action.includes('approved') ? 'green' : log.action.includes('rejected') ? 'red' : log.action.includes('email') || log.action.includes('reminder') ? 'blue' : 'gray' %>"></div>
+          <div class="audit-content">
+            <span class="audit-text"><%= log.details %></span>
+            <span class="audit-meta"><%= new Date(log.created_at).toLocaleString('de-DE') %></span>
+          </div>
+        </div>
+        <% }) %>
+      </div>
+    </div>
+
+    <!-- 6. Aktionen -->
+    <div class="sidebar-card">
+      <h4>Aktionen</h4>
+      <div class="action-list">
+        <a href="/jobs/<%= job.uuid %>/protocol" class="btn btn-ghost btn-sm btn-full" style="margin-bottom:8px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Protokoll-PDF
+        </a>
+        <button class="btn btn-ghost btn-sm btn-full" onclick="sendProtocol()" style="margin-bottom:8px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          Protokoll per Mail
+        </button>
+        <form method="POST" action="/jobs/<%= job.uuid %>/duplicate" style="margin-bottom:8px;">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button type="submit" class="btn btn-ghost btn-sm btn-full">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Job duplizieren
+          </button>
+        </form>
+        <button class="btn btn-ghost btn-sm btn-full" onclick="resendMail(<%= job.id %>)" style="margin-bottom:8px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          Mail erneut
+        </button>
+        <button class="btn btn-ghost btn-sm btn-full" onclick="window.print()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Drucken
+        </button>
+      </div>
+    </div>
+
+    <!-- 7. Danger Zone -->
+    <div class="sidebar-card card-danger">
+      <h4>Gefahrenzone</h4>
+      <form method="POST" action="/jobs/<%= job.uuid %>/delete" onsubmit="return confirm('Freigabe wirklich löschen?')">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button type="submit" class="btn btn-danger btn-sm btn-full">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Freigabe löschen
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<style>
+.pdf-card { border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; margin-bottom:16px; }
+.pdf-card-approved { border-color: var(--green-border); }
+.pdf-card-rejected { border-color: var(--red-border); }
+.pdf-card-header {
+  display:flex; align-items:center; gap:10px; padding:12px 16px; background:var(--bg);
+  font-size:0.88rem; flex-wrap:wrap;
+}
+.pdf-card-num { width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0; }
+.pdf-card-size { color:var(--text-muted); font-size:0.78rem; }
+.pdf-card-header .mf-status { margin-left:auto; }
+.pdf-card-comment { padding:8px 16px; font-size:0.85rem; color:var(--text-muted); font-style:italic; border-top:1px solid var(--border-light); }
+
+/* Version Files */
+.version-block { border-bottom: 1px solid var(--border-light); }
+.version-block:last-child { border-bottom: none; }
+.version-item { display:flex; align-items:center; gap:8px; }
+.version-chevron { color: var(--text-muted); }
+.version-chevron.open { transform: rotate(180deg); }
+.version-files { padding: 6px 0 10px 12px; }
+.vf-item {
+  display:flex; align-items:center; gap:8px; padding:5px 0;
+  font-size:0.82rem; border-bottom:1px solid var(--border-light);
+}
+.vf-item:last-child { border-bottom:none; }
+.vf-info { flex:1; min-width:0; }
+.vf-info span { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:500; }
+.vf-info small { display:block; }
+</style>
+
+<script>
+function toggleVersionFiles(vNum) {
+  const el = document.getElementById('version-files-' + vNum);
+  const chevron = document.getElementById('chevron-' + vNum);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  el.style.display = isOpen ? 'none' : 'block';
+  if (chevron) chevron.classList.toggle('open', !isOpen);
+}
+
+// Aktuelle Version automatisch aufklappen
+document.addEventListener('DOMContentLoaded', () => {
+  toggleVersionFiles(<%= job.current_version %>);
+});
+
+async function resendMail(jobId) {
+  if (!confirm('Freigabe-Mail erneut an den Kunden senden?')) return;
+  const res = await csrfFetch('/api/resend/' + jobId, { method: 'POST' });
+  const data = await res.json();
+  if (data.success) { alert('Mail wurde erneut gesendet.'); location.reload(); }
+  else { alert('Fehler: ' + (data.error || 'Unbekannt')); }
+}
+
+async function sendProtocol() {
+  if (!confirm('Freigabeprotokoll als PDF an Sachbearbeiter und Kunde senden?')) return;
+  try {
+    const res = await csrfFetch('/jobs/<%= job.uuid %>/protocol/send', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    const data = await res.json();
+    if (data.success) { alert('Protokoll gesendet an: ' + data.recipients.join(', ')); location.reload(); }
+    else { alert('Fehler: ' + (data.error || 'Unbekannt')); }
+  } catch (e) { alert('Verbindungsfehler'); }
+}
+</script>
+
+<!-- Share-Modal Template (wird per JS in body verschoben) -->
+<div id="shareModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:#fff;border-radius:12px;padding:28px;width:90%;max-width:460px;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <h3 style="margin:0 0 4px;font-size:1.1rem;">Freigabe-Link teilen</h3>
+    <p style="color:#6b7280;font-size:0.85rem;margin:0 0 20px;">Teilen Sie den Link manuell mit dem Kunden.</p>
+    <div style="margin-bottom:12px;">
+      <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">Freigabe-Link</label>
+      <div style="display:flex;gap:6px;">
+        <input type="text" id="shareUrl" value="<%= baseUrl %>/approve/<%= job.access_token %>" readonly onclick="this.select()" style="flex:1;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.8rem;font-family:monospace;">
+        <button type="button" onclick="copyShare('shareUrl')" style="padding:8px 12px;background:#4361ee;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;">Kopieren</button>
+      </div>
+    </div>
+    <% if (job.access_password) { %>
+    <div style="margin-bottom:12px;">
+      <label style="display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;">Passwort</label>
+      <div style="display:flex;gap:6px;">
+        <input type="text" id="sharePw" value="<%= job.access_password %>" readonly onclick="this.select()" style="flex:1;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-family:monospace;">
+        <button type="button" onclick="copyShare('sharePw')" style="padding:8px 12px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-size:0.8rem;">Kopieren</button>
+      </div>
+    </div>
+    <% } %>
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <button type="button" onclick="copyShareAll()" style="flex:1;padding:10px;background:#4361ee;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Alles kopieren</button>
+      <button type="button" onclick="document.getElementById('shareModal').style.display='none'" style="flex:1;padding:10px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;">Schließen</button>
+    </div>
+    <div id="shareCopyMsg" style="display:none;text-align:center;margin-top:10px;font-size:0.82rem;color:#16a34a;font-weight:600;">✓ In Zwischenablage kopiert!</div>
+  </div>
+</div>
+<script>
+function copyShare(id){var el=document.getElementById(id);el.select();el.setSelectionRange(0,99999);var ok=false;try{ok=document.execCommand('copy')}catch(e){}if(!ok&&navigator.clipboard){navigator.clipboard.writeText(el.value)}var m=document.getElementById('shareCopyMsg');m.style.display='block';setTimeout(function(){m.style.display='none'},2000)}
+function copyShareAll(){var t=document.getElementById('shareUrl').value;<% if(job.access_password){%>t+='\nPasswort: '+document.getElementById('sharePw').value;<%}%>var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy')}catch(e){}document.body.removeChild(ta);var m=document.getElementById('shareCopyMsg');m.style.display='block';setTimeout(function(){m.style.display='none'},2000)}
+// Modal in body verschieben und bei ?share=1 öffnen
+document.addEventListener('DOMContentLoaded',function(){
+  var m=document.getElementById('shareModal');
+  if(m)document.body.appendChild(m);
+  if(new URLSearchParams(window.location.search).get('share')==='1'){m.style.display='flex';history.replaceState(null,'',window.location.pathname)}
+});
+</script>
+
+<%- include('../partials/footer') %>

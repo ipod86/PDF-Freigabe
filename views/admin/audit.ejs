@@ -1,0 +1,97 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Aktivitätsprotokoll</h1>
+    <p class="page-subtitle">Alle Aktionen systemweit</p>
+  </div>
+  <div class="header-actions">
+    <form method="GET" class="filter-inline">
+      <select name="action" onchange="this.form.submit()">
+        <option value="">Alle Aktionen</option>
+        <option value="created" <%= filter.action === 'created' ? 'selected' : '' %>>Erstellt</option>
+        <option value="customer_approved" <%= filter.action === 'customer_approved' ? 'selected' : '' %>>Freigegeben</option>
+        <option value="customer_rejected" <%= filter.action === 'customer_rejected' ? 'selected' : '' %>>Abgelehnt</option>
+        <option value="email_sent" <%= filter.action === 'email_sent' ? 'selected' : '' %>>Mail gesendet</option>
+        <option value="email_resent" <%= filter.action === 'email_resent' ? 'selected' : '' %>>Mail erneut</option>
+        <option value="customer_viewed" <%= filter.action === 'customer_viewed' ? 'selected' : '' %>>Kd. geöffnet</option>
+        <option value="customer_download" <%= filter.action === 'customer_download' ? 'selected' : '' %>>Kd. Download</option>
+        <option value="version_uploaded" <%= filter.action === 'version_uploaded' ? 'selected' : '' %>>Version Upload</option>
+        <option value="reminder_sent" <%= filter.action === 'reminder_sent' ? 'selected' : '' %>>Erinnerung</option>
+        <option value="password_changed" <%= filter.action === 'password_changed' ? 'selected' : '' %>>Passwort</option>
+      </select>
+      <div class="search-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="q" placeholder="Suchen..." value="<%= filter.q %>">
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <% if (logs.length === 0) { %>
+  <div class="empty-state"><p>Keine Einträge gefunden.</p></div>
+  <% } else { %>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Zeitpunkt</th>
+        <th>Aktion</th>
+        <th>Details</th>
+        <th>Benutzer</th>
+        <th>Job</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% logs.forEach(log => { %>
+      <tr>
+        <td class="text-muted" style="white-space:nowrap;"><%= new Date(log.created_at).toLocaleString('de-DE') %></td>
+        <td>
+          <span class="action-badge action-<%= log.action.includes('approved') ? 'green' : log.action.includes('rejected') ? 'red' : log.action.includes('email') || log.action.includes('reminder') ? 'blue' : log.action.includes('viewed') || log.action.includes('download') ? 'purple' : 'gray' %>">
+            <%= log.action.replace(/_/g, ' ') %>
+          </span>
+        </td>
+        <td style="max-width:350px;"><%= log.details || '–' %></td>
+        <td><%= log.user_name || '<em>System/Kunde</em>' %></td>
+        <td>
+          <% if (log.job_uuid) { %>
+          <a href="/jobs/<%= log.job_uuid %>"><%= log.job_name || 'Job' %></a>
+          <% } else { %>–<% } %>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <% if (logs.length >= limit) { %>
+  <div class="pagination">
+    <% if (page > 1) { %>
+    <a href="?page=<%= page - 1 %>&action=<%= filter.action %>&q=<%= filter.q %>" class="btn btn-ghost btn-sm">&laquo; Zurück</a>
+    <% } %>
+    <span class="page-info">Seite <%= page %></span>
+    <a href="?page=<%= page + 1 %>&action=<%= filter.action %>&q=<%= filter.q %>" class="btn btn-ghost btn-sm">Weiter &raquo;</a>
+  </div>
+  <% } %>
+  <% } %>
+</div>
+
+<style>
+.filter-inline { display:flex; gap:10px; align-items:center; }
+.filter-inline select {
+  padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius);
+  font-family:var(--font); font-size:0.85rem; background:var(--bg-card);
+}
+.action-badge {
+  display:inline-block; padding:3px 10px; border-radius:20px;
+  font-size:0.72rem; font-weight:600; white-space:nowrap;
+}
+.action-green  { background:var(--green-bg); color:#065f46; }
+.action-red    { background:var(--red-bg); color:#991b1b; }
+.action-blue   { background:rgba(67,97,238,0.08); color:var(--accent); }
+.action-purple { background:rgba(139,92,246,0.08); color:#7c3aed; }
+.action-gray   { background:var(--bg); color:var(--text-muted); }
+.pagination { display:flex; align-items:center; justify-content:center; gap:16px; padding:20px; }
+.page-info { font-size:0.85rem; color:var(--text-muted); }
+</style>
+
+<%- include('../partials/footer') %>

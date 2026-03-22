@@ -1,0 +1,100 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Systeminformationen</h1>
+    <p class="page-subtitle">Server-Status, Versionen und Speicherplatz</p>
+  </div>
+</div>
+
+<div class="sysinfo-grid">
+  <!-- Server -->
+  <div class="card">
+    <h3>Server</h3>
+    <dl class="info-list">
+      <dt>Hostname</dt><dd><code><%= sysinfo.hostname %></code></dd>
+      <dt>Betriebssystem</dt><dd><code><%= sysinfo.os %></code></dd>
+      <dt>Architektur</dt><dd><code><%= sysinfo.arch %></code></dd>
+      <dt>Uptime Server</dt><dd><%= sysinfo.uptime %></dd>
+      <dt>Uptime App</dt><dd><%= sysinfo.appUptime %></dd>
+    </dl>
+  </div>
+
+  <!-- Speicher -->
+  <div class="card">
+    <h3>Speicher</h3>
+    <dl class="info-list">
+      <dt>RAM gesamt</dt><dd><%= sysinfo.totalMem %></dd>
+      <dt>RAM frei</dt><dd><%= sysinfo.freeMem %></dd>
+      <dt>RAM App (Node.js)</dt><dd><%= sysinfo.appMem %></dd>
+    </dl>
+    <div class="meter-bar" style="margin-top:12px;">
+      <div class="meter-fill" style="width:<%= sysinfo.memPercent %>%;background:<%= sysinfo.memPercent > 85 ? 'var(--red)' : sysinfo.memPercent > 60 ? 'var(--orange)' : 'var(--green)' %>;"></div>
+    </div>
+    <small class="text-muted"><%= sysinfo.memPercent %>% RAM belegt</small>
+  </div>
+
+  <!-- Festplatte -->
+  <div class="card">
+    <h3>Festplatte</h3>
+    <dl class="info-list">
+      <dt>Datenbank</dt><dd><%= sysinfo.dbSize %></dd>
+      <dt>PDF-Uploads</dt><dd><%= sysinfo.uploadsSize %> (<%= sysinfo.uploadCount %> Dateien)</dd>
+      <dt>Sessions</dt><dd><%= sysinfo.sessionsSize %></dd>
+    </dl>
+    <% if (sysinfo.diskFree) { %>
+    <div class="meter-bar" style="margin-top:12px;">
+      <div class="meter-fill" style="width:<%= sysinfo.diskPercent %>%;background:<%= sysinfo.diskPercent > 85 ? 'var(--red)' : sysinfo.diskPercent > 60 ? 'var(--orange)' : 'var(--green)' %>;"></div>
+    </div>
+    <small class="text-muted"><%= sysinfo.diskUsed %> / <%= sysinfo.diskTotal %> belegt (<%= sysinfo.diskPercent %>%)</small>
+    <% } %>
+  </div>
+
+  <!-- Versionen -->
+  <div class="card">
+    <h3>Software-Versionen</h3>
+    <dl class="info-list">
+      <dt>Node.js</dt><dd><code><%= sysinfo.nodeVersion %></code></dd>
+      <dt>npm</dt><dd><code><%= sysinfo.npmVersion %></code></dd>
+      <dt>SQLite</dt><dd><code><%= sysinfo.sqliteVersion %></code></dd>
+      <dt>Express</dt><dd><code><%= sysinfo.expressVersion %></code></dd>
+      <dt>App-Version</dt><dd><code><%= sysinfo.appVersion %></code></dd>
+    </dl>
+  </div>
+
+  <!-- Datenbank-Statistiken -->
+  <div class="card">
+    <h3>Datenbank</h3>
+    <dl class="info-list">
+      <dt>Benutzer</dt><dd><%= sysinfo.counts.users %></dd>
+      <dt>Kunden</dt><dd><%= sysinfo.counts.customers %></dd>
+      <dt>Ansprechpartner</dt><dd><%= sysinfo.counts.contacts %></dd>
+      <dt>Freigaben</dt><dd><%= sysinfo.counts.jobs %></dd>
+      <dt>PDF-Versionen</dt><dd><%= sysinfo.counts.versions %></dd>
+      <dt>Audit-Einträge</dt><dd><%= sysinfo.counts.auditLogs %></dd>
+    </dl>
+  </div>
+
+  <!-- Abhängigkeiten -->
+  <div class="card">
+    <h3>Node.js-Module</h3>
+    <div style="max-height:200px;overflow-y:auto;">
+      <% sysinfo.deps.forEach(d => { %>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);font-size:0.82rem;">
+        <span><%= d.name %></span>
+        <code style="color:var(--text-muted);"><%= d.version %></code>
+      </div>
+      <% }) %>
+    </div>
+  </div>
+</div>
+
+<style>
+.sysinfo-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.sysinfo-grid code { font-family:var(--font-mono); font-size:0.85rem; padding:1px 6px; background:var(--bg); border-radius:4px; }
+.meter-bar { height:8px; background:var(--bg); border-radius:4px; overflow:hidden; }
+.meter-fill { height:100%; border-radius:4px; transition:width 0.5s var(--ease); }
+@media (max-width:768px) { .sysinfo-grid { grid-template-columns:1fr; } }
+</style>
+
+<%- include('../partials/footer') %>

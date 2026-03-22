@@ -1,0 +1,130 @@
+<%- include('partials/header') %>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Mein Profil</h1>
+    <p class="page-subtitle">Persönliche Einstellungen und Passwort</p>
+  </div>
+  <a href="/dashboard" class="btn btn-ghost">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    Zurück
+  </a>
+</div>
+
+<div class="profile-grid">
+  <!-- Profil-Info -->
+  <div class="card">
+    <h3>Kontoinformationen</h3>
+    <div class="profile-info">
+      <div class="profile-avatar-lg">
+        <%= user.name.charAt(0).toUpperCase() %>
+      </div>
+      <dl class="info-list">
+        <dt>Name</dt>
+        <dd><%= user.name %></dd>
+        <dt>E-Mail</dt>
+        <dd><%= user.email %></dd>
+        <dt>Rolle</dt>
+        <dd><%= user.role === 'admin' ? 'Administrator' : 'Sachbearbeiter' %></dd>
+      </dl>
+    </div>
+  </div>
+
+  <!-- Passwort ändern -->
+  <div class="card">
+    <h3>Passwort ändern</h3>
+    <form id="passwordForm" class="password-form">
+      <div class="form-group">
+        <label for="current_password">Aktuelles Passwort</label>
+        <input type="password" id="current_password" name="current_password" required placeholder="••••••••">
+      </div>
+      <div class="form-group">
+        <label for="new_password">Neues Passwort</label>
+        <input type="password" id="new_password" name="new_password" required minlength="8" placeholder="Mindestens 8 Zeichen">
+      </div>
+      <div class="form-group">
+        <label for="confirm_password">Passwort bestätigen</label>
+        <input type="password" id="confirm_password" required minlength="8" placeholder="Erneut eingeben">
+      </div>
+      <div id="pwMessage" style="display:none;margin-bottom:12px;"></div>
+      <button type="submit" class="btn btn-primary" id="pwSubmit">Passwort speichern</button>
+    </form>
+  </div>
+</div>
+
+<style>
+.profile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  max-width: 900px;
+}
+.profile-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  margin-top: 16px;
+}
+.profile-avatar-lg {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem; font-weight: 700;
+  flex-shrink: 0;
+}
+.password-form { margin-top: 16px; }
+@media (max-width: 768px) { .profile-grid { grid-template-columns: 1fr; } }
+</style>
+
+<script>
+document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('pwMessage');
+  const btn = document.getElementById('pwSubmit');
+  const newPw = document.getElementById('new_password').value;
+  const confirm = document.getElementById('confirm_password').value;
+
+  if (newPw !== confirm) {
+    msg.style.display = 'block';
+    msg.className = 'toast toast-error';
+    msg.innerHTML = '<span>Passwörter stimmen nicht überein.</span>';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Speichern...';
+
+  try {
+    const res = await csrfFetch('/api/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        current_password: document.getElementById('current_password').value,
+        new_password: newPw,
+      })
+    });
+    const data = await res.json();
+
+    msg.style.display = 'block';
+    if (data.success) {
+      msg.className = 'toast toast-success';
+      msg.innerHTML = '<span>Passwort erfolgreich geändert.</span>';
+      document.getElementById('passwordForm').reset();
+    } else {
+      msg.className = 'toast toast-error';
+      msg.innerHTML = '<span>' + (data.error || 'Fehler') + '</span>';
+    }
+  } catch {
+    msg.style.display = 'block';
+    msg.className = 'toast toast-error';
+    msg.innerHTML = '<span>Verbindungsfehler.</span>';
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Passwort speichern';
+});
+</script>
+
+<%- include('partials/footer') %>

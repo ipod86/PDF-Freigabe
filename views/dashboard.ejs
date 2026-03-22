@@ -1,0 +1,289 @@
+<%- include('partials/header') %>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">Übersicht aller Freigaben <span class="live-dot" title="Aktualisiert sich automatisch">● Live</span></p>
+  </div>
+  <div class="header-actions">
+    <a href="/api/export/csv" class="btn btn-ghost" title="CSV-Export">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export
+    </a>
+    <% if (user.role === 'admin') { %>
+    <a href="/admin/statistics" class="btn btn-ghost" title="Statistiken">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Statistiken
+    </a>
+    <% } %>
+    <a href="/jobs/create" class="btn btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Neue Freigabe
+    </a>
+  </div>
+</div>
+
+<!-- Statistik-Karten -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-number"><%= stats.total %></div>
+    <div class="stat-label">Gesamt</div>
+  </div>
+  <div class="stat-card stat-pending">
+    <div class="stat-number"><%= stats.pending %></div>
+    <div class="stat-label">Offen</div>
+  </div>
+  <div class="stat-card stat-approved">
+    <div class="stat-number"><%= stats.approved %></div>
+    <div class="stat-label">Freigegeben</div>
+  </div>
+  <div class="stat-card stat-rejected">
+    <div class="stat-number"><%= stats.rejected %></div>
+    <div class="stat-label">Abgelehnt</div>
+  </div>
+</div>
+
+<!-- Filter -->
+<div class="filter-bar">
+  <form method="GET" class="filter-form">
+    <div class="filter-tabs">
+      <a href="/dashboard" class="filter-tab <%= filter === 'all' ? 'active' : '' %>">Alle</a>
+      <a href="/dashboard?status=pending" class="filter-tab tab-pending <%= filter === 'pending' ? 'active' : '' %>">Offen</a>
+      <a href="/dashboard?status=approved" class="filter-tab tab-approved <%= filter === 'approved' ? 'active' : '' %>">Freigegeben</a>
+      <a href="/dashboard?status=rejected" class="filter-tab tab-rejected <%= filter === 'rejected' ? 'active' : '' %>">Abgelehnt</a>
+    </div>
+    <div class="search-box">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" name="q" placeholder="Suchen..." value="<%= search %>"<% if(filter !== 'all') { %> data-status="<%= filter %>"<% } %>>
+    </div>
+  </form>
+</div>
+
+<!-- Tabelle -->
+<form id="bulkForm" method="POST">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+  <!-- Bulk-Aktionsleiste (erscheint bei Auswahl) -->
+  <div class="bulk-bar" id="bulkBar" style="display:none;">
+    <span><strong id="bulkCount">0</strong> ausgewählt</span>
+    <div class="bulk-actions">
+      <button type="submit" formaction="/jobs/bulk/resend" class="btn btn-ghost btn-sm" onclick="return confirm('Mails erneut an alle ausgewählten offenen Freigaben senden?')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        Mail erneut
+      </button>
+      <button type="submit" formaction="/jobs/bulk/delete" class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="return confirm('Alle ausgewählten Freigaben unwiderruflich löschen?')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Löschen
+      </button>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="uncheckAll()">Abbrechen</button>
+    </div>
+  </div>
+
+  <% if (jobs.length === 0) { %>
+  <div class="empty-state">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    <p>Keine Freigaben gefunden.</p>
+    <a href="/jobs/create" class="btn btn-primary">Erste Freigabe erstellen</a>
+  </div>
+  <% } else { %>
+  <div class="table-wrap">
+  <table class="data-table">
+      <thead>
+        <tr>
+          <th class="col-check"><input type="checkbox" id="selectAll" title="Alle auswählen"></th>
+          <th class="col-status">Status</th>
+          <th class="col-hide-mobile">Erstellt</th>
+          <th>Fällig</th>
+          <th class="col-hide-mobile">Ersteller</th>
+          <th>Empfänger</th>
+          <th>Job-Name</th>
+          <th class="col-info">Info</th>
+          <th class="col-actions">Aktionen</th>
+        </tr>
+      </thead>
+      <tbody>
+        <%
+          const today = new Date(); today.setHours(0,0,0,0);
+          const inDays = (d, n) => { const t = new Date(d); t.setDate(t.getDate() + n); return t; };
+        %>
+        <% jobs.forEach(job => { %>
+        <%
+          let dueClass = '';
+          if (job.due_date && job.status === 'pending') {
+            const due = new Date(job.due_date); due.setHours(0,0,0,0);
+            if (due < today) dueClass = 'due-overdue';
+            else if (due <= inDays(today, 2)) dueClass = 'due-urgent';
+            else if (due <= inDays(today, 5)) dueClass = 'due-soon';
+          }
+        %>
+        <tr class="row-<%= job.status %> <%= dueClass %>">
+          <td class="col-check">
+            <input type="checkbox" name="job_ids" value="<%= job.uuid %>" class="bulk-check">
+          </td>
+          <td class="col-status">
+            <span class="status-dot status-<%= job.status %>" title="<%= job.status === 'pending' ? 'Offen' : job.status === 'approved' ? 'Freigegeben' : 'Abgelehnt' %>"></span>
+          </td>
+          <td class="text-muted col-hide-mobile"><%= new Date(job.created_at).toLocaleDateString('de-DE') %></td>
+          <td>
+            <% if (job.due_date) { %>
+            <span class="due-badge <%= dueClass %>"><%= new Date(job.due_date).toLocaleDateString('de-DE') %></span>
+            <% } else { %>
+            <span class="text-muted">–</span>
+            <% } %>
+          </td>
+          <td class="col-hide-mobile"><%= job.creator_name %></td>
+          <td>
+            <span class="contact-info">
+              <strong><%= job.customer_company %></strong><br>
+              <small><%= job.contact_name %></small>
+            </span>
+          </td>
+          <td>
+            <a href="/jobs/<%= job.uuid %>" class="job-link"><%= job.job_name %></a>
+            <% if (job.current_version > 1) { %>
+            <span class="version-badge">V<%= job.current_version %></span>
+            <% } %>
+          </td>
+          <td class="col-info">
+            <% if (job.internal_comment) { %>
+            <span class="info-pill info-comment" title="<%= job.internal_comment %>">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              Notiz
+            </span>
+            <% } %>
+            <% if (job.visibility === 'private') { %>
+            <span class="info-pill info-private" title="Nur für mich sichtbar">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </span>
+            <% } %>
+            <% if (job.access_password) { %>
+            <span class="info-pill info-locked" title="Passwortgeschützt">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </span>
+            <% } %>
+            <% if (!job.email_customer) { %>
+            <span class="info-pill info-nomail" title="Keine Kunden-Mail">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="1" y1="1" x2="23" y2="23"/><path d="M21 7v10a2 2 0 0 1-2 2H5"/><polyline points="22,6 12,13 2,6"/></svg>
+            </span>
+            <% } %>
+            <% if (job.file_count > 1) { %>
+            <span class="info-pill info-files" title="<%= job.files_approved %>/<%= job.file_count %> freigegeben, <%= job.files_rejected %> abgelehnt, <%= job.files_pending %> offen">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <%= job.files_approved %>/<%= job.file_count %>
+            </span>
+            <% } %>
+            <% if (job.followup_date) { %>
+            <%
+              const fuDate = new Date(job.followup_date); fuDate.setHours(0,0,0,0);
+              const fuDue = fuDate <= today;
+            %>
+            <span class="info-pill <%= fuDue ? 'info-followup-due' : 'info-followup' %>" title="Wiedervorlage: <%= new Date(job.followup_date).toLocaleDateString('de-DE') %><%= job.followup_note ? ' – ' + job.followup_note : '' %>">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <%= new Date(job.followup_date).toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit'}) %>
+            </span>
+            <% } %>
+          </td>
+          <td class="col-actions">
+            <a href="/jobs/<%= job.uuid %>/download" class="btn-icon" title="Download">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </a>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    </div>
+    <% } %>
+</form>
+
+<script>
+// Bulk-Auswahl
+const selectAll = document.getElementById('selectAll');
+const bulkBar = document.getElementById('bulkBar');
+const bulkCount = document.getElementById('bulkCount');
+const checks = document.querySelectorAll('.bulk-check');
+
+function updateBulkBar() {
+  const checked = document.querySelectorAll('.bulk-check:checked').length;
+  bulkCount.textContent = checked;
+  bulkBar.style.display = checked > 0 ? 'flex' : 'none';
+}
+
+function uncheckAll() {
+  checks.forEach(c => c.checked = false);
+  if (selectAll) selectAll.checked = false;
+  updateBulkBar();
+}
+
+if (selectAll) {
+  selectAll.addEventListener('change', () => {
+    checks.forEach(c => c.checked = selectAll.checked);
+    updateBulkBar();
+  });
+}
+checks.forEach(c => c.addEventListener('change', updateBulkBar));
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTO-REFRESH (alle 30 Sek. – pausiert wenn Checkboxen aktiv)
+// ═══════════════════════════════════════════════════════════════════════════
+let refreshTimer;
+let refreshPaused = false;
+
+function startAutoRefresh() {
+  refreshTimer = setInterval(async () => {
+    // Nicht aktualisieren wenn Bulk-Auswahl aktiv
+    const anyChecked = document.querySelectorAll('.bulk-check:checked').length > 0;
+    if (anyChecked || refreshPaused) return;
+
+    try {
+      // Stats aktualisieren (AJAX)
+      const res = await fetch('/api/stats');
+      const stats = await res.json();
+
+      // Stat-Karten aktualisieren
+      const cards = document.querySelectorAll('.stat-card .stat-number');
+      if (cards.length >= 4) {
+        const oldTotal = cards[0].textContent;
+        cards[0].textContent = stats.total;
+        cards[1].textContent = stats.pending;
+        cards[2].textContent = stats.approved;
+        cards[3].textContent = stats.rejected;
+
+        // Wenn sich die Gesamtzahl geändert hat → Tabelle neu laden
+        if (oldTotal !== String(stats.total)) {
+          location.reload();
+          return;
+        }
+      }
+
+      // Prüfen ob sich ein Status geändert hat (leichtgewichtig)
+      const statusRes = await fetch(window.location.href, { headers: { 'X-Requested-With': 'dashboard-check' } });
+      if (statusRes.ok) {
+        const html = await statusRes.text();
+        // Anzahl der Status-Dots vergleichen
+        const currentApproved = document.querySelectorAll('.status-approved').length;
+        const currentRejected = document.querySelectorAll('.status-rejected').length;
+        const newApproved = (html.match(/status-approved/g) || []).length;
+        const newRejected = (html.match(/status-rejected/g) || []).length;
+
+        if (newApproved !== currentApproved || newRejected !== currentRejected) {
+          location.reload();
+        }
+      }
+    } catch { /* Netzwerkfehler ignorieren */ }
+  }, 30000);
+}
+
+// Beim Tab-Wechsel pausieren/fortsetzen
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    refreshPaused = true;
+  } else {
+    refreshPaused = false;
+  }
+});
+
+startAutoRefresh();
+</script>
+
+<%- include('partials/footer') %>

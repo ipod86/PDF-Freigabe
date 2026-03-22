@@ -1,0 +1,237 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title"><%= template.name %></h1>
+    <p class="page-subtitle"><%= template.description || 'Mail-Vorlage bearbeiten' %></p>
+  </div>
+  <a href="/admin/templates" class="btn btn-ghost">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    Zurück
+  </a>
+</div>
+
+<!-- Platzhalter-Leiste -->
+<div class="placeholder-bar">
+  <span class="placeholder-label">Platzhalter einfügen:</span>
+  <div class="placeholder-buttons">
+    <button type="button" class="ph-btn" data-ph="{{contact_name}}" title="Name des Ansprechpartners">Ansprechpartner</button>
+    <button type="button" class="ph-btn" data-ph="{{job_name}}" title="Name des Auftrags">Auftragsname</button>
+    <button type="button" class="ph-btn" data-ph="{{description}}" title="Besonderheiten/Hinweis">Besonderheiten</button>
+    <button type="button" class="ph-btn" data-ph="{{approval_link}}" title="Link zur Kunden-Freigabeseite">Freigabe-Link</button>
+    <button type="button" class="ph-btn" data-ph="{{job_link}}" title="Link zur internen Detailseite">Job-Link (intern)</button>
+    <button type="button" class="ph-btn" data-ph="{{creator_name}}" title="Name des Sachbearbeiters">Sachbearbeiter</button>
+    <button type="button" class="ph-btn" data-ph="{{creator_email}}" title="E-Mail des Sachbearbeiters">Sachbearbeiter-Mail</button>
+    <button type="button" class="ph-btn" data-ph="{{customer_company}}" title="Firmenname des Kunden">Firma</button>
+    <button type="button" class="ph-btn" data-ph="{{customer_comment}}" title="Kommentar des Kunden bei Freigabe/Ablehnung">Kunden-Kommentar</button>
+    <button type="button" class="ph-btn" data-ph="{{status_text}}" title="Freigegeben / Abgelehnt">Status-Text</button>
+    <button type="button" class="ph-btn" data-ph="{{company_name}}" title="Ihr Firmenname (aus Einstellungen)">Eigene Firma</button>
+    <button type="button" class="ph-btn" data-ph="{{due_date}}" title="Fälligkeitsdatum der Freigabe">Fällig bis</button>
+    <button type="button" class="ph-btn" data-ph="{{access_password}}" title="Passwort für die Freigabe (falls gesetzt)">Passwort</button>
+    <button type="button" class="ph-btn" data-ph="{{privacy_link}}" title="Link zur Datenschutzerklärung (automatisch im Footer)">Datenschutz-Link</button>
+    <button type="button" class="ph-btn" data-ph="{{imprint_link}}" title="Link zum Impressum (automatisch im Footer)">Impressum-Link</button>
+    <button type="button" class="ph-btn ph-cond" data-ph="{{#if description}}...{{/if}}" title="Block nur anzeigen wenn Besonderheiten vorhanden">Wenn Besonderheiten</button>
+    <button type="button" class="ph-btn ph-cond" data-ph="{{#if customer_comment}}...{{/if}}" title="Block nur anzeigen wenn Kunden-Kommentar vorhanden">Wenn Kommentar</button>
+    <button type="button" class="ph-btn ph-cond" data-ph="{{#if due_date}}...{{/if}}" title="Block nur anzeigen wenn Fälligkeitsdatum gesetzt">Wenn Fällig</button>
+    <button type="button" class="ph-btn ph-cond" data-ph="{{#if access_password}}...{{/if}}" title="Block nur anzeigen wenn Passwort gesetzt">Wenn Passwort</button>
+  </div>
+</div>
+
+<form method="POST" action="/admin/templates/<%= template.id %>" class="template-form">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+  <div class="form-row-3" style="margin-bottom:16px;">
+    <div class="form-group">
+      <label for="tpl_name">Vorlagenname</label>
+      <input type="text" id="tpl_name" name="name" value="<%= template.name %>" required>
+    </div>
+    <div class="form-group">
+      <label for="tpl_event">Auslöser (Ereignis)</label>
+      <select name="event" id="tpl_event">
+        <option value="approval_created" <%= template.event === 'approval_created' ? 'selected' : '' %>>Freigabe erstellt</option>
+        <option value="approval_approved" <%= template.event === 'approval_approved' ? 'selected' : '' %>>Freigabe erteilt</option>
+        <option value="approval_rejected" <%= template.event === 'approval_rejected' ? 'selected' : '' %>>Freigabe abgelehnt</option>
+        <option value="customer_confirmation" <%= template.event === 'customer_confirmation' ? 'selected' : '' %>>Kunden-Bestätigung</option>
+        <option value="reminder" <%= template.event === 'reminder' ? 'selected' : '' %>>Erinnerung</option>
+        <option value="version_uploaded" <%= template.event === 'version_uploaded' ? 'selected' : '' %>>Neue Version</option>
+        <option value="manual" <%= template.event === 'manual' ? 'selected' : '' %>>Manuell</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="tpl_recipient">Empfänger</label>
+      <select name="recipient" id="tpl_recipient">
+        <option value="customer" <%= template.recipient === 'customer' ? 'selected' : '' %>>Kunde</option>
+        <option value="creator" <%= template.recipient === 'creator' ? 'selected' : '' %>>Sachbearbeiter</option>
+        <option value="both" <%= template.recipient === 'both' ? 'selected' : '' %>>Beide</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="tpl_desc">Beschreibung</label>
+    <input type="text" id="tpl_desc" name="description" value="<%= template.description || '' %>" placeholder="Wann wird diese Vorlage verwendet?">
+  </div>
+
+  <div class="form-group">
+    <label for="subject">Betreff</label>
+    <input type="text" id="subject" name="subject" value="<%= template.subject %>" required class="editor-target">
+  </div>
+
+  <div class="form-group">
+    <label for="body_html">HTML-Inhalt</label>
+    <textarea id="body_html" name="body_html" rows="18" class="code-editor editor-target"><%= template.body_html %></textarea>
+  </div>
+
+  <div class="form-group">
+    <label for="body_text">Text-Inhalt (Fallback ohne HTML)</label>
+    <textarea id="body_text" name="body_text" rows="10" class="code-editor editor-target"><%= template.body_text %></textarea>
+  </div>
+
+  <div class="form-group">
+    <label>Vorschau <small class="text-muted">(mit Beispieldaten)</small></label>
+    <div class="template-preview" id="preview"></div>
+  </div>
+
+  <div class="form-actions">
+    <a href="/admin/templates" class="btn btn-ghost">Abbrechen</a>
+    <button type="submit" class="btn btn-primary">Vorlage speichern</button>
+  </div>
+</form>
+
+<!-- Platzhalter-Referenz -->
+<div class="card" style="margin-top:24px;">
+  <h3>Platzhalter-Referenz</h3>
+  <table class="data-table" style="font-size:0.85rem;">
+    <thead>
+      <tr><th>Platzhalter</th><th>Deutsch</th><th>Beschreibung</th><th>Beispielwert</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>{{contact_name}}</code></td><td>Ansprechpartner</td><td>Name des Kunden-Kontakts</td><td>Anna Müller</td></tr>
+      <tr><td><code>{{job_name}}</code></td><td>Auftragsname</td><td>Name des Freigabe-Auftrags</td><td>Visitenkarten Sommer 2025</td></tr>
+      <tr><td><code>{{description}}</code></td><td>Besonderheiten</td><td>Hinweis an den Kunden (optional)</td><td>Bitte auf HKS 43 achten</td></tr>
+      <tr><td><code>{{approval_link}}</code></td><td>Freigabe-Link</td><td>Personalisierter Link zur Freigabeseite</td><td>https://…/approve/abc123</td></tr>
+      <tr><td><code>{{job_link}}</code></td><td>Job-Link</td><td>Interner Link zur Detailansicht</td><td>https://…/jobs/def456</td></tr>
+      <tr><td><code>{{creator_name}}</code></td><td>Sachbearbeiter</td><td>Name des erstellenden Mitarbeiters</td><td>Max Mustermann</td></tr>
+      <tr><td><code>{{creator_email}}</code></td><td>Sachbearbeiter-Mail</td><td>E-Mail des Mitarbeiters</td><td>max@firma.de</td></tr>
+      <tr><td><code>{{customer_company}}</code></td><td>Firma</td><td>Firmenname des Kunden</td><td>Beispiel GmbH</td></tr>
+      <tr><td><code>{{customer_comment}}</code></td><td>Kunden-Kommentar</td><td>Kommentar bei Freigabe/Ablehnung</td><td>Sieht gut aus!</td></tr>
+      <tr><td><code>{{status_text}}</code></td><td>Status-Text</td><td>Freigegeben oder Abgelehnt</td><td>Freigegeben</td></tr>
+      <tr><td><code>{{company_name}}</code></td><td>Eigene Firma</td><td>Ihr Firmenname aus Einstellungen</td><td>Druckerei Mustermann</td></tr>
+      <tr><td><code>{{due_date}}</code></td><td>Fällig bis</td><td>Fälligkeitsdatum der Freigabe</td><td>25.03.2026</td></tr>
+      <tr><td><code>{{access_password}}</code></td><td>Passwort</td><td>Zugangspasswort für die Freigabe (falls gesetzt)</td><td>Geheim123</td></tr>
+      <tr><td><code>{{privacy_link}}</code></td><td>Datenschutz-Link</td><td>URL zur Datenschutzerklärung (automatisch im Footer)</td><td>https://…/datenschutz</td></tr>
+      <tr><td><code>{{imprint_link}}</code></td><td>Impressum-Link</td><td>URL zum Impressum (automatisch im Footer)</td><td>https://…/impressum</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<style>
+.placeholder-bar {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: var(--shadow);
+}
+.placeholder-label { font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px; }
+.placeholder-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.ph-btn {
+  display: inline-flex; align-items: center; padding: 5px 12px;
+  border: 1px solid var(--border); border-radius: 20px; background: var(--bg);
+  font-family: var(--font); font-size: 0.78rem; font-weight: 600;
+  color: var(--text-secondary); cursor: grab; transition: all 0.15s var(--ease);
+  user-select: none;
+}
+.ph-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.ph-btn:active { cursor: grabbing; transform: scale(0.95); }
+.ph-cond { border-style: dashed; color: var(--orange); }
+.ph-cond:hover { border-color: var(--orange); background: var(--orange-bg); color: #92400e; }
+.code-editor { font-family: var(--font-mono) !important; font-size: 0.82rem !important; tab-size: 2; line-height: 1.6; }
+.template-preview { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; min-height: 200px; font-size: 0.9rem; }
+.template-preview code { font-size: 0.82rem; }
+</style>
+
+<script>
+// Aktiver Editor (der zuletzt fokussiert wurde)
+let activeEditor = document.getElementById('body_html');
+
+document.querySelectorAll('.editor-target').forEach(el => {
+  el.addEventListener('focus', () => { activeEditor = el; });
+});
+
+// Klick → Platzhalter an Cursor-Position einfügen
+document.querySelectorAll('.ph-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const ph = btn.dataset.ph;
+    if (!activeEditor) return;
+    const start = activeEditor.selectionStart;
+    const end = activeEditor.selectionEnd;
+    const text = activeEditor.value;
+
+    if (ph.includes('...')) {
+      // Bedingter Block: Text umschließen
+      const selected = text.substring(start, end) || '...';
+      const tag = ph.replace('...', selected);
+      activeEditor.value = text.substring(0, start) + tag + text.substring(end);
+    } else {
+      activeEditor.value = text.substring(0, start) + ph + text.substring(end);
+    }
+
+    activeEditor.focus();
+    const newPos = start + ph.length;
+    activeEditor.setSelectionRange(newPos, newPos);
+    updatePreview();
+  });
+
+  // Drag & Drop
+  btn.setAttribute('draggable', 'true');
+  btn.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('text/plain', btn.dataset.ph);
+    e.dataTransfer.effectAllowed = 'copy';
+  });
+});
+
+// Drop auf Textareas erlauben
+document.querySelectorAll('.editor-target').forEach(el => {
+  el.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  el.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const ph = e.dataTransfer.getData('text/plain');
+    const start = el.selectionStart;
+    el.value = el.value.substring(0, start) + ph + el.value.substring(start);
+    el.focus();
+    updatePreview();
+  });
+});
+
+// Vorschau
+const htmlEditor = document.getElementById('body_html');
+const preview = document.getElementById('preview');
+
+function updatePreview() {
+  let html = htmlEditor.value;
+  const demoVars = {
+    contact_name: 'Anna Müller', job_name: 'Visitenkarten Sommer 2025',
+    description: 'Bitte auf Sonderfarbe HKS 43 achten', approval_link: '#',
+    job_link: '#', creator_name: 'Max Sachbearbeiter', creator_email: 'max@firma.de',
+    customer_company: 'Beispiel GmbH', customer_comment: 'Sieht gut aus!',
+    status_text: 'Freigegeben', company_name: 'Druckerei Mustermann',
+    due_date: '25.03.2026',
+    access_password: 'Geheim123',
+    privacy_link: '/datenschutz',
+    imprint_link: '/impressum'
+  };
+  for (const [k,v] of Object.entries(demoVars)) html = html.replace(new RegExp('\\{\\{' + k + '\\}\\}', 'g'), v);
+  html = html.replace(/\{\{#if\s+\w+\}\}/g, '').replace(/\{\{\/if\}\}/g, '');
+  preview.innerHTML = html;
+}
+
+htmlEditor.addEventListener('input', updatePreview);
+updatePreview();
+</script>
+
+<%- include('../partials/footer') %>

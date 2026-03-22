@@ -1,0 +1,231 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">
+      <span class="version-badge" style="font-size:0.9rem;">V<%= job.current_version + 1 %></span>
+      Neue Version: <%= job.job_name %>
+    </h1>
+    <p class="page-subtitle"><%= job.customer_company %> – <%= job.contact_name %></p>
+  </div>
+  <a href="/jobs/<%= job.uuid %>" class="btn btn-ghost">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    Zurück zur Freigabe
+  </a>
+</div>
+
+<% if (job.customer_comment) { %>
+<div class="version-feedback">
+  <div class="feedback-icon">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+  </div>
+  <div>
+    <strong>Kunden-Feedback zu V<%= job.current_version %>:</strong>
+    <p style="margin:4px 0 0;"><%= job.customer_comment %></p>
+  </div>
+</div>
+<% } %>
+
+<form method="POST" action="/jobs/<%= job.uuid %>/version" enctype="multipart/form-data" class="create-form">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <div class="form-grid">
+    <!-- Linke Spalte -->
+    <div class="form-section">
+      <h3 class="section-title">Auftragsdaten</h3>
+
+      <div class="form-group">
+        <label>Auftragsname</label>
+        <input type="text" value="<%= job.job_name %>" disabled class="input-locked">
+      </div>
+
+      <div class="form-group">
+        <label>Kunde</label>
+        <input type="text" value="<%= job.customer_company %>" disabled class="input-locked">
+      </div>
+
+      <div class="form-group">
+        <label>Ansprechpartner</label>
+        <input type="text" value="<%= job.contact_name %> (<%= job.contact_email %>)" disabled class="input-locked">
+      </div>
+
+      <div class="form-group">
+        <label for="description">Besonderheiten / Hinweis für Kunden</label>
+        <textarea id="description" name="description" rows="3" placeholder="Sichtbar für den Kunden – z.B. was wurde geändert..."><%= job.description || '' %></textarea>
+        <small class="form-hint">Wird dem Kunden auf der Freigabeseite angezeigt. Vorherige Anmerkung vorausgefüllt.</small>
+      </div>
+
+      <div class="form-group">
+        <label for="internal_comment">Interner Kommentar</label>
+        <textarea id="internal_comment" name="internal_comment" rows="2" placeholder="Nur intern sichtbar – z.B. Änderungen in dieser Version..."><%= job.internal_comment || '' %></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>E-Mail-Benachrichtigungen</label>
+        <div class="checkbox-group" style="display:flex;flex-direction:column;gap:8px;">
+          <label class="checkbox-label" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
+            <input type="checkbox" name="email_customer" value="1" <%= job.email_customer ? 'checked' : '' %>>
+            <span><strong>E-Mail an Kunden</strong></span>
+          </label>
+          <label class="checkbox-label" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
+            <input type="checkbox" name="email_creator" value="1" <%= job.email_creator ? 'checked' : '' %>>
+            <span><strong>E-Mail an Sachbearbeiter</strong></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-row-2">
+        <div class="form-group">
+          <label for="due_date">Fälligkeitsdatum</label>
+          <input type="date" id="due_date" name="due_date" value="<%= job.due_date || '' %>">
+        </div>
+        <div class="form-group">
+          <label for="followup_date">Wiedervorlage</label>
+          <input type="date" id="followup_date" name="followup_date" value="<%= job.followup_date || '' %>">
+        </div>
+      </div>
+      <% if (job.followup_note) { %>
+      <div class="form-group">
+        <label for="followup_note">Wiedervorlage-Notiz</label>
+        <input type="text" id="followup_note" name="followup_note" value="<%= job.followup_note || '' %>">
+      </div>
+      <% } %>
+    </div>
+
+    <!-- Rechte Spalte -->
+    <div class="form-section">
+      <h3 class="section-title">Neue PDF-Dateien (V<%= job.current_version + 1 %>)</h3>
+
+      <% if (currentFiles.length > 0) { %>
+      <div class="prev-files-info">
+        <h4>Bisherige Dateien (V<%= job.current_version %>):</h4>
+        <% currentFiles.forEach((f, i) => { %>
+        <div class="prev-file-item prev-file-<%= f.status %>">
+          <span class="status-dot status-<%= f.status %>"></span>
+          <span><%= f.original_name %></span>
+          <small class="text-muted"><%= f.status === 'approved' ? 'Freigegeben' : f.status === 'rejected' ? 'Abgelehnt' : 'Offen' %></small>
+        </div>
+        <% }) %>
+        <p class="text-muted" style="margin-top:8px;font-size:0.82rem;">Die neuen Dateien ersetzen alle bisherigen. Alte Versionen bleiben in der Historie.</p>
+      </div>
+      <% } %>
+
+      <div class="upload-area" id="uploadArea">
+        <input type="file" id="pdfs" name="pdfs" accept="application/pdf" required multiple class="upload-input">
+        <div class="upload-placeholder" id="uploadPlaceholder">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <polyline points="9 15 12 12 15 15"/>
+          </svg>
+          <p class="upload-text">Korrigierte PDFs hierher ziehen</p>
+          <p class="upload-hint">Eine oder mehrere PDFs auswählen</p>
+        </div>
+        <div class="upload-file-list" id="uploadFileList" style="display:none;"></div>
+      </div>
+
+      <div class="form-actions" style="margin-top:24px;">
+        <a href="/jobs/<%= job.uuid %>" class="btn btn-ghost">Abbrechen</a>
+        <button type="submit" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Version <%= job.current_version + 1 %> erstellen
+        </button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<style>
+.input-locked {
+  background: var(--bg) !important;
+  color: var(--text-muted) !important;
+  border-color: var(--border-light) !important;
+  cursor: not-allowed;
+}
+.version-feedback {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 16px 20px; margin-bottom: 20px;
+  background: var(--orange-bg); border: 1px solid var(--orange-border);
+  border-radius: var(--radius-lg); font-size: 0.9rem;
+}
+.feedback-icon { color: var(--orange); flex-shrink: 0; margin-top: 2px; }
+.prev-files-info {
+  padding: 14px 16px; margin-bottom: 16px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); font-size: 0.85rem;
+}
+.prev-files-info h4 { font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
+.prev-file-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0; font-size: 0.82rem;
+}
+.prev-file-item small { margin-left: auto; }
+</style>
+
+<script>
+// Akkumulierender Multi-File Upload (identisch mit create.ejs)
+const uploadArea = document.getElementById('uploadArea');
+const fileInput = document.getElementById('pdfs');
+const placeholder = document.getElementById('uploadPlaceholder');
+const fileList = document.getElementById('uploadFileList');
+let collectedFiles = new DataTransfer();
+
+function syncInput() { fileInput.files = collectedFiles.files; }
+
+function renderFileList() {
+  const files = collectedFiles.files;
+  if (files.length === 0) {
+    placeholder.style.display = ''; fileList.style.display = 'none';
+    uploadArea.classList.remove('has-file'); fileInput.style.display = '';
+    return;
+  }
+  placeholder.style.display = 'none'; fileList.style.display = 'block';
+  uploadArea.classList.add('has-file'); fileInput.style.display = 'none';
+
+  let html = '<div class="file-count">' + files.length + ' Datei' + (files.length > 1 ? 'en' : '') + ' ausgewählt</div>';
+  for (let i = 0; i < files.length; i++) {
+    html += '<div class="file-entry">' +
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
+      '<span class="file-entry-name">' + files[i].name + '</span>' +
+      '<span class="file-entry-size">' + (files[i].size / 1024 / 1024).toFixed(2) + ' MB</span>' +
+      '<button type="button" class="file-remove-btn" data-remove="' + i + '" title="Entfernen">&times;</button>' +
+      '</div>';
+  }
+  html += '<div style="display:flex;gap:8px;margin-top:10px;">';
+  html += '<label class="btn btn-ghost btn-sm" style="cursor:pointer;flex:1;justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Weitere hinzufügen<input type="file" accept="application/pdf" multiple style="display:none;" id="addMoreFiles"></label>';
+  html += '<button type="button" class="btn btn-ghost btn-sm" id="clearAllFiles">Alle entfernen</button>';
+  html += '</div>';
+  fileList.innerHTML = html;
+
+  fileList.querySelectorAll('[data-remove]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.remove);
+      const d = new DataTransfer();
+      for (let j = 0; j < collectedFiles.files.length; j++) { if (j !== idx) d.items.add(collectedFiles.files[j]); }
+      collectedFiles = d; syncInput(); renderFileList();
+    });
+  });
+  document.getElementById('addMoreFiles')?.addEventListener('change', (e) => {
+    for (const f of e.target.files) if (f.type === 'application/pdf') collectedFiles.items.add(f);
+    syncInput(); renderFileList();
+  });
+  document.getElementById('clearAllFiles')?.addEventListener('click', () => {
+    collectedFiles = new DataTransfer(); syncInput(); renderFileList();
+  });
+}
+
+fileInput.addEventListener('change', () => {
+  for (const f of fileInput.files) collectedFiles.items.add(f);
+  syncInput(); renderFileList();
+});
+
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault(); uploadArea.classList.remove('drag-over');
+  for (const f of e.dataTransfer.files) if (f.type === 'application/pdf') collectedFiles.items.add(f);
+  syncInput(); renderFileList();
+});
+</script>
+
+<%- include('../partials/footer') %>

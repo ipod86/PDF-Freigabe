@@ -1,0 +1,187 @@
+<%- include('../partials/header') %>
+
+<%
+const eventLabels = {
+  approval_created: 'Freigabe erstellt',
+  approval_approved: 'Freigabe erteilt',
+  approval_rejected: 'Freigabe abgelehnt',
+  customer_confirmation: 'Kunden-Bestätigung',
+  reminder: 'Erinnerung',
+  version_uploaded: 'Neue Version',
+  manual: 'Manuell',
+};
+const eventColors = {
+  approval_created: '#2563eb',
+  approval_approved: '#16a34a',
+  approval_rejected: '#dc2626',
+  customer_confirmation: '#6366f1',
+  reminder: '#f59e0b',
+  version_uploaded: '#0891b2',
+  manual: '#64748b',
+};
+%>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Mail-Vorlagen</h1>
+    <p class="page-subtitle">E-Mail-Texte für alle Ereignisse anpassen</p>
+  </div>
+  <button class="btn btn-primary" onclick="document.getElementById('newTplModal').style.display='flex'">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Neue Vorlage
+  </button>
+</div>
+
+<div class="info-box mb-lg">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+  <div>
+    Vorlagen werden automatisch beim jeweiligen Ereignis versendet. Pro Ereignis können mehrere Vorlagen aktiv sein.
+    Vorlagen mit <span class="tpl-badge-system">System</span> können nicht gelöscht, aber bearbeitet und deaktiviert werden.
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Aktiv</th>
+        <th>Name</th>
+        <th>Ereignis</th>
+        <th>Empfänger</th>
+        <th class="col-hide-mobile">Betreff</th>
+        <th>Typ</th>
+        <th class="col-actions">Aktionen</th>
+      </tr>
+    </thead>
+    <tbody>
+      <%
+        const recipientLabels = { customer: 'Kunde', creator: 'Sachbearbeiter', both: 'Beide' };
+        const recipientIcons = { customer: '👤', creator: '🔧', both: '👥' };
+      %>
+      <% templates.forEach(t => { %>
+      <tr class="<%= !t.active ? 'row-inactive' : '' %>">
+        <td>
+          <form method="POST" action="/admin/templates/<%= t.id %>/toggle" style="display:inline;">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" class="toggle-btn <%= t.active ? 'toggle-on' : 'toggle-off' %>" title="<%= t.active ? 'Deaktivieren' : 'Aktivieren' %>">
+              <span class="toggle-dot"></span>
+            </button>
+          </form>
+        </td>
+        <td>
+          <a href="/admin/templates/<%= t.id %>" class="tpl-name"><%= t.name %></a>
+          <% if (t.description) { %><br><small class="text-muted"><%= t.description %></small><% } %>
+        </td>
+        <td>
+          <span class="event-badge" style="background:<%= eventColors[t.event] || '#64748b' %>20;color:<%= eventColors[t.event] || '#64748b' %>;border:1px solid <%= eventColors[t.event] || '#64748b' %>40;">
+            <%= eventLabels[t.event] || t.event %>
+          </span>
+        </td>
+        <td><span style="font-size:0.82rem;"><%= recipientIcons[t.recipient] || '👤' %> <%= recipientLabels[t.recipient] || t.recipient || 'Kunde' %></span></td>
+        <td class="text-muted col-hide-mobile" style="font-size:0.82rem;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><%= t.subject %></td>
+        <td>
+          <% if (!t.deletable) { %>
+          <span class="tpl-badge-system">System</span>
+          <% } else { %>
+          <span class="tpl-badge-custom">Eigene</span>
+          <% } %>
+        </td>
+        <td class="col-actions">
+          <a href="/admin/templates/<%= t.id %>" class="btn-icon" title="Bearbeiten">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </a>
+          <% if (t.deletable) { %>
+          <form method="POST" action="/admin/templates/<%= t.id %>/delete" style="display:inline;" onsubmit="return confirm('Vorlage &quot;<%= t.name %>&quot; löschen?')">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" class="btn-icon btn-icon-danger" title="Löschen">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </form>
+          <% } %>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<!-- Modal: Neue Vorlage -->
+<div class="modal-backdrop" id="newTplModal" style="display:none;" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal-content">
+    <h3>Neue Mail-Vorlage erstellen</h3>
+    <form method="POST" action="/admin/templates/create">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="form-group">
+        <label for="tpl_name">Name</label>
+        <input type="text" name="name" id="tpl_name" required placeholder="z.B. Zusätzliche Benachrichtigung">
+      </div>
+      <div class="form-group">
+        <label for="tpl_event">Auslöser (Ereignis)</label>
+        <select name="event" id="tpl_event">
+          <option value="approval_created">Freigabe erstellt</option>
+          <option value="approval_approved">Freigabe erteilt</option>
+          <option value="approval_rejected">Freigabe abgelehnt</option>
+          <option value="customer_confirmation">Kunden-Bestätigung</option>
+          <option value="reminder">Erinnerung</option>
+          <option value="version_uploaded">Neue Version hochgeladen</option>
+          <option value="manual">Manuell (kein Auto-Versand)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="tpl_recipient">Empfänger</label>
+        <select name="recipient" id="tpl_recipient">
+          <option value="customer">Kunde</option>
+          <option value="creator">Sachbearbeiter</option>
+          <option value="both">Beide</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="tpl_subject">Betreff</label>
+        <input type="text" name="subject" id="tpl_subject" required placeholder="z.B. Info: {{job_name}}">
+      </div>
+      <div class="form-group">
+        <label for="tpl_desc">Beschreibung (optional)</label>
+        <input type="text" name="description" id="tpl_desc" placeholder="Wann wird diese Vorlage verwendet?">
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('newTplModal').style.display='none'">Abbrechen</button>
+        <button type="submit" class="btn btn-primary">Erstellen & Bearbeiten</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+.event-badge { font-size:0.72rem; font-weight:700; padding:3px 10px; border-radius:20px; white-space:nowrap; }
+.tpl-badge-system { font-size:0.7rem; font-weight:600; padding:2px 8px; border-radius:4px; background:var(--bg); color:var(--text-muted); border:1px solid var(--border); }
+.tpl-badge-custom { font-size:0.7rem; font-weight:600; padding:2px 8px; border-radius:4px; background:var(--accent-soft); color:var(--accent); border:1px solid rgba(67,97,238,0.2); }
+.tpl-name { font-weight:600; color:var(--text); }
+.tpl-name:hover { color:var(--accent); }
+
+.toggle-btn {
+  position:relative; width:36px; height:20px; border-radius:10px; border:none; cursor:pointer;
+  transition:background 0.2s;
+}
+.toggle-on  { background:var(--green); }
+.toggle-off { background:var(--border); }
+.toggle-dot {
+  position:absolute; top:2px; width:16px; height:16px; border-radius:50%; background:#fff;
+  transition:left 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.2);
+}
+.toggle-on .toggle-dot  { left:18px; }
+.toggle-off .toggle-dot { left:2px; }
+
+.row-inactive { opacity:0.5; }
+
+.modal-backdrop {
+  position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:999;
+  display:flex; align-items:center; justify-content:center;
+}
+.modal-content {
+  background:var(--bg-card); border-radius:var(--radius-lg); padding:32px;
+  width:100%; max-width:500px; box-shadow:var(--shadow-lg);
+}
+.modal-content h3 { margin-bottom:20px; }
+</style>
+
+<%- include('../partials/footer') %>

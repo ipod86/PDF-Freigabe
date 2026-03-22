@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <% if (typeof companyLogo !== 'undefined' && companyLogo) { %><link rel="icon" href="/uploads/logo/<%= companyLogo %>"><% } else { %><link rel="icon" type="image/svg+xml" href="/img/favicon.svg"><% } %>
+  <link rel="stylesheet" href="/css/fonts.css?v=<%= typeof v !== 'undefined' ? v : '1' %>">
+  <link rel="stylesheet" href="/css/style.css?v=<%= typeof v !== 'undefined' ? v : '1' %>">
+  <link rel="stylesheet" href="/css/approve.css?v=<%= typeof v !== 'undefined' ? v : '1' %>">
+  <style>
+    :root {
+      --brand: <%= typeof primaryColor !== 'undefined' ? primaryColor : '#4361ee' %>;
+      --brand-btn: <%= typeof accentColor !== 'undefined' ? accentColor : '#2563eb' %>;
+    }
+    .approve-header { background: var(--brand); position: sticky; top: 0; z-index: 100; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); background: <%= typeof primaryColor !== 'undefined' ? primaryColor : '#4361ee' %>e6; }
+    .btn-approve { background: var(--brand-btn); }
+    .btn-approve:hover { background: var(--brand-btn); filter: brightness(0.85); }
+    .mf-num { background: var(--brand); }
+    a { color: var(--brand); }
+    a:hover { color: var(--brand-btn); }
+  </style>
+</head>
+<body class="approve-body">
+  <header class="approve-header">
+    <div class="approve-brand">
+      <% if (typeof companyLogo !== 'undefined' && companyLogo) { %>
+      <img src="/uploads/logo/<%= companyLogo %>" alt="<%= companyName %>" style="max-height:32px;">
+      <% } else { %>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <% } %>
+      <span><%= companyName %></span>
+    </div>
+  </header>
+
+  <main class="approve-main">
+    <% if (job.status !== 'pending') { %>
+    <!-- Bereits bearbeitet -->
+    <div class="approve-done">
+      <div class="done-icon done-<%= job.status %>">
+        <% if (job.status === 'approved') { %>
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <% } else { %>
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        <% } %>
+      </div>
+      <h2><%= job.status === 'approved' ? 'Freigabe erteilt' : 'Freigabe abgelehnt' %></h2>
+      <p>am <%= job.status_changed_at ? new Date(job.status_changed_at).toLocaleString('de-DE') : '' %></p>
+      <% if (job.customer_comment) { %>
+      <div class="done-comment">
+        <strong>Ihr Kommentar:</strong>
+        <p><%= job.customer_comment %></p>
+      </div>
+      <% } %>
+    </div>
+    <% } else { %>
+    <!-- Freigabe-Interface -->
+    <div class="approve-card">
+      <div class="approve-info">
+        <h1><%= job.job_name %></h1>
+        <% if (job.current_version > 1) { %><span class="version-badge">Version <%= job.current_version %></span><% } %>
+        <p class="approve-greeting">Guten Tag <%= job.contact_name %>,</p>
+        <p>bitte prüfen Sie das folgende Dokument und erteilen oder verweigern Sie die Druckfreigabe.</p>
+        <% if (job.description) { %>
+        <div class="approve-note">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span><%= job.description %></span>
+        </div>
+        <% } %>
+        <% if (job.due_date) { %>
+        <div class="approve-note" style="border-color:var(--accent);background:rgba(67,97,238,0.05);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>Freigabe erbeten bis <strong><%= new Date(job.due_date).toLocaleDateString('de-DE') %></strong></span>
+        </div>
+        <% } %>
+      </div>
+
+      <% const isMultiFile = typeof files !== 'undefined' && files.length > 1; %>
+
+      <% if (!isMultiFile) { %>
+      <!-- PDF-Vorschau (nur bei einzelnem PDF) -->
+      <div class="approve-pdf">
+        <div class="pdf-toolbar">
+          <span class="pdf-filename"><%= currentVersion ? currentVersion.original_name : 'Dokument' %></span>
+          <a href="/approve/<%= job.access_token %>/download" class="btn btn-ghost btn-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Herunterladen
+          </a>
+        </div>
+        <iframe src="/approve/<%= job.access_token %>/preview" class="pdf-frame approve-frame"></iframe>
+      </div>
+      <% } %>
+
+      <% if (isMultiFile) { %>
+      <!-- Einzelfreigaben (Multi-PDF) -->
+      <div class="multi-files-section">
+        <h3>Einzelne Dokumente freigeben (<%= files.length %> Dateien)</h3>
+        <p class="text-muted" style="font-size:0.88rem;margin-bottom:16px;">Bitte prüfen und geben Sie jedes Dokument einzeln frei. Der Gesamtstatus wird automatisch gesetzt wenn alle bearbeitet sind.</p>
+        <div class="multi-file-list">
+          <% files.forEach((f, i) => { %>
+          <div class="multi-file-card" id="file-card-<%= f.id %>" data-status="<%= f.status %>">
+            <div class="mf-header">
+              <span class="mf-num"><%= i + 1 %></span>
+              <div class="mf-info">
+                <strong><%= f.original_name %></strong>
+                <small><%= (f.file_size / 1024).toFixed(0) %> KB</small>
+              </div>
+              <span class="mf-status mf-status-<%= f.status %>">
+                <%= f.status === 'approved' ? '✓ Freigegeben' : f.status === 'rejected' ? '✗ Abgelehnt' : 'Ausstehend' %>
+              </span>
+            </div>
+            <% if (f.status === 'pending') { %>
+            <div class="mf-preview">
+              <iframe src="/approve/<%= job.access_token %>/file/<%= f.id %>/preview" class="mf-iframe"></iframe>
+            </div>
+            <div class="mf-actions">
+              <input type="text" class="mf-comment" id="file-comment-<%= f.id %>" placeholder="Kommentar (optional)">
+              <div class="mf-buttons">
+                <button class="btn btn-approve btn-sm" onclick="approveFile(<%= f.id %>, 'approve')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  Freigeben
+                </button>
+                <button class="btn btn-reject btn-sm" onclick="approveFile(<%= f.id %>, 'reject')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  Ablehnen
+                </button>
+              </div>
+            </div>
+            <% } else if (f.customer_comment) { %>
+            <div class="mf-done-comment"><em>"<%= f.customer_comment %>"</em></div>
+            <% } %>
+          </div>
+          <% }) %>
+        </div>
+      </div>
+      <% } %>
+
+      <% if (!isMultiFile) { %>
+      <!-- Freigabe-Aktionen (nur bei einzelnem PDF) -->
+      <div class="approve-actions" id="approveActions">
+        <div class="form-group">
+          <label for="comment">Kommentar (optional)</label>
+          <textarea id="comment" rows="3" placeholder="Anmerkungen zur Freigabe oder Ablehnung..."></textarea>
+        </div>
+        <div class="approve-buttons">
+          <button class="btn btn-approve" id="btnApprove" onclick="submitApproval('approve')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Druckfreigabe erteilen
+          </button>
+          <button class="btn btn-reject" id="btnReject" onclick="submitApproval('reject')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Ablehnen
+          </button>
+        </div>
+      </div>
+      <% } %>
+
+      <!-- Ergebnis -->
+      <div class="approve-result" id="approveResult" style="display:none;">
+        <div class="result-icon" id="resultIcon"></div>
+        <h2 id="resultTitle"></h2>
+        <p id="resultText"></p>
+      </div>
+    </div>
+
+    <% if (allVersions.length > 1) { %>
+    <div class="approve-versions">
+      <h3>Vorherige Versionen</h3>
+      <% allVersions.forEach(v => { %>
+      <% if (v.version_number !== job.current_version) { %>
+      <div class="version-link">Version <%= v.version_number %> – <%= new Date(v.created_at).toLocaleDateString('de-DE') %></div>
+      <% } %>
+      <% }) %>
+    </div>
+    <% } %>
+    <% } %>
+  </main>
+
+  <footer class="approve-footer">
+    <p>Powered by PDF-Freigabe · <%= companyName %> · <a href="/impressum" style="color:inherit;text-decoration:underline;">Impressum</a> · <a href="/datenschutz" style="color:inherit;text-decoration:underline;">Datenschutz</a></p>
+  </footer>
+
+  <script>
+  async function submitApproval(action) {
+    const comment = document.getElementById('comment').value;
+    const label = action === 'approve' ? 'Freigabe' : 'Ablehnung';
+
+    if (!confirm(`Möchten Sie die ${label} wirklich erteilen?`)) return;
+
+    const btnApprove = document.getElementById('btnApprove');
+    const btnReject = document.getElementById('btnReject');
+    btnApprove.disabled = true;
+    btnReject.disabled = true;
+
+    try {
+      const res = await fetch(window.location.pathname, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, comment })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        document.getElementById('approveActions').style.display = 'none';
+        const result = document.getElementById('approveResult');
+        result.style.display = 'block';
+
+        if (data.status === 'approved') {
+          document.getElementById('resultIcon').innerHTML = '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+          document.getElementById('resultTitle').textContent = 'Vielen Dank!';
+          document.getElementById('resultText').textContent = 'Ihre Freigabe wurde erfolgreich übermittelt. Sie erhalten eine Bestätigung per E-Mail.';
+        } else {
+          document.getElementById('resultIcon').innerHTML = '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+          document.getElementById('resultTitle').textContent = 'Ablehnung übermittelt';
+          document.getElementById('resultText').textContent = 'Ihre Rückmeldung wurde übermittelt. Der Sachbearbeiter wird sich mit einer überarbeiteten Version bei Ihnen melden.';
+        }
+      } else {
+        alert(data.error || 'Ein Fehler ist aufgetreten.');
+        btnApprove.disabled = false;
+        btnReject.disabled = false;
+      }
+    } catch(err) {
+      alert('Verbindungsfehler. Bitte versuchen Sie es erneut.');
+      btnApprove.disabled = false;
+      btnReject.disabled = false;
+    }
+  }
+
+  async function approveFile(fileId, action) {
+    const comment = document.getElementById('file-comment-' + fileId)?.value || '';
+    const label = action === 'approve' ? 'freigeben' : 'ablehnen';
+    if (!confirm(`Dieses Dokument wirklich ${label}?`)) return;
+
+    try {
+      const res = await fetch(window.location.pathname + '/file/' + fileId, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, comment })
+      });
+      const data = await res.json();
+      if (data.success) {
+        const card = document.getElementById('file-card-' + fileId);
+        const statusEl = card.querySelector('.mf-status');
+        const actionsEl = card.querySelector('.mf-actions');
+        const previewEl = card.querySelector('.mf-preview');
+
+        if (data.fileStatus === 'approved') {
+          statusEl.className = 'mf-status mf-status-approved';
+          statusEl.textContent = '✓ Freigegeben';
+        } else {
+          statusEl.className = 'mf-status mf-status-rejected';
+          statusEl.textContent = '✗ Abgelehnt';
+        }
+        if (actionsEl) actionsEl.remove();
+        if (previewEl) previewEl.style.display = 'none';
+
+        if (data.jobComplete) {
+          // Abschlussmeldung anzeigen
+          const banner = document.createElement('div');
+          banner.style.cssText = 'position:fixed;top:0;left:0;right:0;padding:16px;background:#10b981;color:#fff;text-align:center;font-weight:700;font-size:1rem;z-index:9999;';
+          banner.textContent = 'Alle Dokumente bearbeitet – vielen Dank! Seite wird aktualisiert...';
+          document.body.appendChild(banner);
+          setTimeout(() => location.reload(), 2000);
+        }
+      } else {
+        alert(data.error || 'Fehler');
+      }
+    } catch(e) { alert('Verbindungsfehler'); }
+  }
+  </script>
+</body>
+</html>
