@@ -116,7 +116,7 @@
         <% } %>
         <dt>Mail an Kunde</dt><dd><%= job.email_customer ? 'Ja' : 'Nein (manueller Link)' %></dd>
         <dt>Mail an Sachbearbeiter</dt><dd><%= job.email_creator ? 'Ja' : 'Nein' %></dd>
-        <% if (job.no_reminder) { %><dt>Erinnerungen</dt><dd>Deaktiviert</dd><% } %>
+        <dt>Erinnerungen</dt><dd><%= job.no_reminder ? 'Deaktiviert' : 'Aktiv' %></dd>
         <% if (job.due_date) { %>
         <dt>Fällig bis</dt>
         <dd>
