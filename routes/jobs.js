@@ -543,6 +543,83 @@ router.post('/:uuid/files', requireLogin, upload.array('pdfs', 20), (req, res) =
   res.redirect(`/jobs/${req.params.uuid}`);
 });
 
+// ─── Bulk: Mehrere Jobs löschen ─────────────────────────────────────────────
+router.post('/bulk/delete', requireLogin, (req, res) => {
+  const db = getDb();
+  let { job_ids } = req.body;
+
+  if (typeof job_ids === 'string') job_ids = [job_ids];
+  if (!Array.isArray(job_ids) || job_ids.length === 0) {
+    req.session.flash = { type: 'error', text: 'Keine Jobs ausgewählt.' };
+    return res.redirect('/dashboard');
+  }
+
+  let deleted = 0;
+  for (const uuid of job_ids) {
+    const job = db.prepare('SELECT * FROM jobs WHERE uuid = ?').get(uuid);
+    if (!job) continue;
+    if (job.creator_id !== req.session.user.id && req.session.user.role !== 'admin') continue;
+
+    const versions = db.prepare('SELECT stored_name FROM job_versions WHERE job_id = ?').all(job.id);
+    for (const v of versions) {
+      const fp = path.join(UPLOAD_DIR, v.stored_name);
+      if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    }
+    db.prepare('DELETE FROM job_versions WHERE job_id = ?').run(job.id);
+    db.prepare('DELETE FROM audit_log WHERE job_id = ?').run(job.id);
+    db.prepare('DELETE FROM notifications WHERE job_id = ?').run(job.id);
+    db.prepare('DELETE FROM jobs WHERE id = ?').run(job.id);
+    deleted++;
+  }
+
+  req.session.flash = { type: 'success', text: `${deleted} Freigabe(n) gelöscht.` };
+  res.redirect('/dashboard');
+});
+
+// ─── Bulk: Status zurücksetzen (Erneut senden) ─────────────────────────────
+router.post('/bulk/resend', requireLogin, (req, res) => {
+  const db = getDb();
+  let { job_ids } = req.body;
+
+  if (typeof job_ids === 'string') job_ids = [job_ids];
+  if (!Array.isArray(job_ids) || job_ids.length === 0) {
+    req.session.flash = { type: 'error', text: 'Keine Jobs ausgewählt.' };
+    return res.redirect('/dashboard');
+  }
+
+  let sent = 0;
+  const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+
+  for (const uuid of job_ids) {
+    const job = db.prepare(`
+      SELECT j.*, co.name AS contact_name, co.email AS contact_email
+      FROM jobs j JOIN contacts co ON co.id = j.contact_id
+      WHERE j.uuid = ? AND j.status = 'pending'
+    `).get(uuid);
+
+    if (!job) continue;
+
+    sendMail('new_approval', job.contact_email, {
+      contact_name: job.contact_name,
+      job_name: job.job_name,
+      description: job.description || '',
+      approval_link: `${baseUrl}/approve/${job.access_token}`,
+      creator_name: req.session.user.name,
+      creator_email: req.session.user.email,
+    });
+
+    db.prepare(`
+      INSERT INTO audit_log (job_id, user_id, action, details)
+      VALUES (?, ?, 'email_resent', ?)
+    `).run(job.id, req.session.user.id, `Bulk: Mail erneut an ${job.contact_email}`);
+
+    sent++;
+  }
+
+  req.session.flash = { type: 'success', text: `${sent} Mail(s) erneut gesendet.` };
+  res.redirect('/dashboard');
+});
+
 // ─── Job löschen ────────────────────────────────────────────────────────────
 router.post('/:uuid/delete', requireLogin, (req, res) => {
   const db = getDb();
@@ -628,83 +705,6 @@ router.post('/:uuid/duplicate', requireLogin, (req, res) => {
 
   req.session.flash = { type: 'success', text: `Job dupliziert: "${newName}". Bitte prüfen und ggf. Kunden neu benachrichtigen.` };
   res.redirect(`/jobs/${newUuid}`);
-});
-
-// ─── Bulk: Mehrere Jobs löschen ─────────────────────────────────────────────
-router.post('/bulk/delete', requireLogin, (req, res) => {
-  const db = getDb();
-  let { job_ids } = req.body;
-
-  if (typeof job_ids === 'string') job_ids = [job_ids];
-  if (!Array.isArray(job_ids) || job_ids.length === 0) {
-    req.session.flash = { type: 'error', text: 'Keine Jobs ausgewählt.' };
-    return res.redirect('/dashboard');
-  }
-
-  let deleted = 0;
-  for (const uuid of job_ids) {
-    const job = db.prepare('SELECT * FROM jobs WHERE uuid = ?').get(uuid);
-    if (!job) continue;
-    if (job.creator_id !== req.session.user.id && req.session.user.role !== 'admin') continue;
-
-    const versions = db.prepare('SELECT stored_name FROM job_versions WHERE job_id = ?').all(job.id);
-    for (const v of versions) {
-      const fp = path.join(UPLOAD_DIR, v.stored_name);
-      if (fs.existsSync(fp)) fs.unlinkSync(fp);
-    }
-    db.prepare('DELETE FROM job_versions WHERE job_id = ?').run(job.id);
-    db.prepare('DELETE FROM audit_log WHERE job_id = ?').run(job.id);
-    db.prepare('DELETE FROM notifications WHERE job_id = ?').run(job.id);
-    db.prepare('DELETE FROM jobs WHERE id = ?').run(job.id);
-    deleted++;
-  }
-
-  req.session.flash = { type: 'success', text: `${deleted} Freigabe(n) gelöscht.` };
-  res.redirect('/dashboard');
-});
-
-// ─── Bulk: Status zurücksetzen (Erneut senden) ─────────────────────────────
-router.post('/bulk/resend', requireLogin, (req, res) => {
-  const db = getDb();
-  let { job_ids } = req.body;
-
-  if (typeof job_ids === 'string') job_ids = [job_ids];
-  if (!Array.isArray(job_ids) || job_ids.length === 0) {
-    req.session.flash = { type: 'error', text: 'Keine Jobs ausgewählt.' };
-    return res.redirect('/dashboard');
-  }
-
-  let sent = 0;
-  const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
-
-  for (const uuid of job_ids) {
-    const job = db.prepare(`
-      SELECT j.*, co.name AS contact_name, co.email AS contact_email
-      FROM jobs j JOIN contacts co ON co.id = j.contact_id
-      WHERE j.uuid = ? AND j.status = 'pending'
-    `).get(uuid);
-
-    if (!job) continue;
-
-    sendMail('new_approval', job.contact_email, {
-      contact_name: job.contact_name,
-      job_name: job.job_name,
-      description: job.description || '',
-      approval_link: `${baseUrl}/approve/${job.access_token}`,
-      creator_name: req.session.user.name,
-      creator_email: req.session.user.email,
-    });
-
-    db.prepare(`
-      INSERT INTO audit_log (job_id, user_id, action, details)
-      VALUES (?, ?, 'email_resent', ?)
-    `).run(job.id, req.session.user.id, `Bulk: Mail erneut an ${job.contact_email}`);
-
-    sent++;
-  }
-
-  req.session.flash = { type: 'success', text: `${sent} Mail(s) erneut gesendet.` };
-  res.redirect('/dashboard');
 });
 
 module.exports = router;
