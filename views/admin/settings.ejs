@@ -94,7 +94,7 @@
       </div>
       <div class="form-group">
         <label for="smtp_pass">SMTP-Passwort</label>
-        <input type="password" id="smtp_pass" name="smtp_pass" value="<%= settings.smtp_pass || '' %>">
+        <input type="password" id="smtp_pass" name="smtp_pass" placeholder="<%= settings.smtp_pass ? 'Passwort gesetzt – leer lassen um es nicht zu ändern' : 'Passwort eingeben' %>">
       </div>
     </div>
     <div class="settings-row">
@@ -176,16 +176,30 @@
   </div>
 </form>
 
+<script src="/js/purify.min.js"></script>
 <script>
+function sanitizedHtml(html) {
+  if (typeof DOMPurify !== 'undefined') {
+    return DOMPurify.sanitize(html, {
+      FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'base'],
+      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus'],
+    });
+  }
+  // Fallback: plain text wenn DOMPurify nicht geladen
+  const d = document.createElement('div');
+  d.textContent = html;
+  return d.innerHTML;
+}
+
 const ppEditor = document.getElementById('privacy_policy');
 const ppPreview = document.getElementById('privacyPreview');
-function updatePrivacyPreview() { ppPreview.innerHTML = ppEditor.value; }
+function updatePrivacyPreview() { ppPreview.innerHTML = sanitizedHtml(ppEditor.value); }
 ppEditor.addEventListener('input', updatePrivacyPreview);
 updatePrivacyPreview();
 
 const imEditor = document.getElementById('imprint');
 const imPreview = document.getElementById('imprintPreview');
-function updateImprintPreview() { imPreview.innerHTML = imEditor.value; }
+function updateImprintPreview() { imPreview.innerHTML = sanitizedHtml(imEditor.value); }
 imEditor.addEventListener('input', updateImprintPreview);
 updateImprintPreview();
 </script>
@@ -211,7 +225,7 @@ async function sendTestMail() {
     const res = await csrfFetch('/api/email-test', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({recipient}) });
     const data = await res.json();
     if (data.success) result.innerHTML='<span style="color:var(--green)">✓ Testmail gesendet!</span>';
-    else result.innerHTML='<span style="color:var(--red)">✗ ' + (data.error||'Fehler') + '</span>';
+    else { const span = document.createElement('span'); span.style.color='var(--red)'; span.textContent='✗ ' + (data.error||'Fehler'); result.replaceChildren(span); }
   } catch(e) { result.innerHTML='<span style="color:var(--red)">Verbindungsfehler</span>'; }
 }
 </script>

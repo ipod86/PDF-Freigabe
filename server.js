@@ -33,8 +33,11 @@ if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir,  { recursive: true });
 const SESSION_SECRET = process.env.SESSION_SECRET;
 if (!SESSION_SECRET || SESSION_SECRET === 'dev-secret-change-me') {
   if (IS_PROD) {
-    console.error('[SECURITY] WARNUNG: Kein sicheres SESSION_SECRET gesetzt!');
+    console.error('[SECURITY] FATAL: Kein sicheres SESSION_SECRET gesetzt!');
     console.error('  Bitte in .env setzen: SESSION_SECRET=$(openssl rand -hex 48)');
+    process.exit(1);
+  } else {
+    console.warn('[SECURITY] WARNUNG: Kein sicheres SESSION_SECRET – nur in Entwicklung akzeptabel!');
   }
 }
 
@@ -196,13 +199,9 @@ app.use((req, res, next) => {
   // Öffentliche Routen ohne CSRF
   if (req.path.startsWith('/approve/')) return next();
 
-  // Multipart-Routen: req.body ist leer vor Multer
-  // Geschützt durch: SameSite=lax Session-Cookie + requireLogin
-  const contentType = req.headers['content-type'] || '';
-  if (contentType.includes('multipart/form-data')) return next();
-
-  // Token aus Body oder Header (NICHT aus Cookie — das wäre kein Schutz)
-  const token = req.body?._csrf || req.headers['x-csrf-token'];
+  // Token aus Header (für Multipart/AJAX) oder Body (für reguläre Formulare).
+  // Alle JS-basierten Uploads senden den Token als X-CSRF-Token Header via csrfFetch().
+  const token = req.headers['x-csrf-token'] || req.body?._csrf;
 
   if (!token || token !== req.session.csrfToken) {
     console.warn(`[CSRF] Abgelehnt: ${req.method} ${req.path}`);

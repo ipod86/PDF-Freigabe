@@ -4,12 +4,45 @@ const crypto = require('crypto');
 const { requireLogin, requireAdmin } = require('../middleware/auth');
 const { getDb } = require('../database');
 
+/**
+ * SSRF-Schutz: Nur öffentliche http/https-URLs erlauben.
+ * Blockiert localhost, private IPs (RFC 1918), Link-Local, Loopback usw.
+ */
+function isSafeWebhookUrl(rawUrl) {
+  let parsed;
+  try { parsed = new URL(rawUrl); } catch { return false; }
+  if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+  const host = parsed.hostname.toLowerCase();
+  // Bekannte lokale Namen
+  if (['localhost', 'localhost.localdomain', '0.0.0.0', ''].includes(host)) return false;
+  // IP-basierte Prüfung
+  try {
+    const { isIPv4, isIPv6 } = require('net');
+    if (isIPv4(host) || isIPv6(host)) {
+      // Einfache String-Checks für private/reservierte Bereiche
+      if (/^127\./.test(host)) return false;              // Loopback
+      if (/^10\./.test(host)) return false;               // RFC 1918
+      if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return false; // RFC 1918
+      if (/^192\.168\./.test(host)) return false;         // RFC 1918
+      if (/^169\.254\./.test(host)) return false;         // Link-Local (AWS metadata)
+      if (/^::1$/.test(host)) return false;               // IPv6 Loopback
+      if (/^fd/.test(host) || /^fc/.test(host)) return false; // IPv6 ULA
+      if (host === '0.0.0.0') return false;
+    }
+  } catch { /* kein IP-Adressenformat — hostname erlaubt */ }
+  return true;
+}
+
 router.get('/', requireLogin, requireAdmin, (req, res) => {
   res.render('admin/webhooks', { title: 'Webhooks', hooks: getDb().prepare('SELECT * FROM webhooks ORDER BY created_at DESC').all() });
 });
 
 router.post('/', requireLogin, requireAdmin, (req, res) => {
   const { name, url, events, method } = req.body;
+  if (!isSafeWebhookUrl(url)) {
+    req.session.flash = { type: 'error', text: 'Ungültige URL. Nur öffentliche http/https-URLs sind erlaubt (keine lokalen IPs oder privaten Netzwerke).' };
+    return res.redirect('/webhooks');
+  }
   const secret = crypto.randomBytes(20).toString('hex');
   getDb().prepare('INSERT INTO webhooks (name, url, events, method, secret) VALUES (?, ?, ?, ?, ?)').run(name, url, events || 'all', method || 'POST', secret);
   req.session.flash = { type: 'success', text: `Webhook "${name}" erstellt.` };
@@ -42,6 +75,11 @@ async function triggerWebhooks(event, payload) {
         }
 
         let url = hook.url;
+        // Nochmalige SSRF-Prüfung zur Laufzeit (URL könnte aus älteren Einträgen kommen)
+        if (!isSafeWebhookUrl(url)) {
+          console.warn(`[WEBHOOK] Übersprungen – unsichere URL "${url}" für Hook "${hook.name}"`);
+          continue;
+        }
         let fetchOpts = { method, headers, signal: AbortSignal.timeout(10000) };
 
         if (method === 'GET') {

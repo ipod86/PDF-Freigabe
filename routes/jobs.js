@@ -356,7 +356,7 @@ router.post('/:uuid/version', requireLogin, upload.array('pdfs', 20), (req, res)
 });
 
 // ─── PDF-Download ───────────────────────────────────────────────────────────
-router.get('/:uuid/download{/:version}', (req, res) => {
+router.get('/:uuid/download{/:version}', requireLogin, (req, res) => {
   const db = getDb();
   const job = db.prepare('SELECT * FROM jobs WHERE uuid = ?').get(req.params.uuid);
   if (!job) return res.status(404).send('Nicht gefunden');
@@ -383,7 +383,7 @@ router.get('/:uuid/download{/:version}', (req, res) => {
 });
 
 // ─── PDF-Vorschau (für PDF.js) ──────────────────────────────────────────────
-router.get('/:uuid/preview{/:version}', (req, res) => {
+router.get('/:uuid/preview{/:version}', requireLogin, (req, res) => {
   const db = getDb();
   const job = db.prepare('SELECT * FROM jobs WHERE uuid = ?').get(req.params.uuid);
   if (!job) return res.status(404).send('Nicht gefunden');
@@ -407,7 +407,7 @@ router.get('/:uuid/preview{/:version}', (req, res) => {
 });
 
 // ─── Einzeldatei-Vorschau (intern) ──────────────────────────────────────────
-router.get('/:uuid/file/:fileId/preview', (req, res) => {
+router.get('/:uuid/file/:fileId/preview', requireLogin, (req, res) => {
   const db = getDb();
   const job = db.prepare('SELECT * FROM jobs WHERE uuid = ?').get(req.params.uuid);
   if (!job) return res.status(404).send('Nicht gefunden');
@@ -424,7 +424,7 @@ router.get('/:uuid/file/:fileId/preview', (req, res) => {
 });
 
 // ─── Einzeldatei-Download (intern) ──────────────────────────────────────────
-router.get('/:uuid/file/:fileId/download', (req, res) => {
+router.get('/:uuid/file/:fileId/download', requireLogin, (req, res) => {
   const db = getDb();
   const job = db.prepare('SELECT * FROM jobs WHERE uuid = ?').get(req.params.uuid);
   if (!job) return res.status(404).send('Nicht gefunden');

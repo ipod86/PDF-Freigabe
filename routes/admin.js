@@ -210,6 +210,8 @@ router.post('/settings', adminOnly, logoUpload.single('logo'), (req, res) => {
   const upsert = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=?');
   for (const [key, value] of Object.entries(req.body)) {
     if (key === '_csrf') continue;
+    // SMTP-Passwort: leeres Feld bedeutet "nicht ändern"
+    if (key === 'smtp_pass' && !value) continue;
     upsert.run(key, value, value);
   }
   // Logo gespeichert?
