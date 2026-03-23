@@ -291,6 +291,16 @@ function initialize() {
       password_reset_expires DATETIME,
       created_at DATETIME DEFAULT (datetime('now','localtime'))
     );
+
+    CREATE TABLE IF NOT EXISTS user_invitations (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      email      TEXT NOT NULL,
+      role       TEXT NOT NULL DEFAULT 'user',
+      token      TEXT NOT NULL UNIQUE,
+      invited_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at DATETIME NOT NULL,
+      created_at DATETIME DEFAULT (datetime('now','localtime'))
+    );
   `);
 
   // Migration: email_sent → email_customer (alte Daten übernehmen)
@@ -306,6 +316,30 @@ function initialize() {
           '<h2>Wiedervorlage</h2><p>Guten Tag {{creator_name}},</p><p>für den Auftrag <strong>{{job_name}}</strong> ({{customer_company}}) ist eine Wiedervorlage fällig.</p>{{#if followup_note}}<p>Notiz: <em>{{followup_note}}</em></p>{{/if}}<p><a href="{{job_link}}" style="display:inline-block;padding:12px 32px;background:#6366f1;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">Zum Auftrag</a></p>',
           'Wiedervorlage: {{job_name}}\n\nAuftrag: {{job_name}} ({{customer_company}})\n{{#if followup_note}}Notiz: {{followup_note}}\n{{/if}}\nLink: {{job_link}}',
           'Interne Erinnerung an den Sachbearbeiter bei fälliger Wiedervorlage.');
+    }
+  } catch {}
+
+  // Einladungs-Template hinzufügen wenn noch nicht vorhanden
+  try {
+    const hasInvite = db.prepare("SELECT id FROM mail_templates WHERE slug='user_invite'").get();
+    if (!hasInvite) {
+      db.prepare(`INSERT INTO mail_templates (slug, name, event, recipient, subject, body_html, body_text, description, deletable) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`)
+        .run(
+          'user_invite',
+          'Mitarbeiter-Einladung',
+          'manual',
+          'creator',
+          'Einladung zur PDF-Freigabe-Plattform',
+          `<h2>Sie wurden eingeladen</h2>
+<p>Hallo,</p>
+<p><strong>{{invited_by}}</strong> hat Sie als <strong>{{role_label}}</strong> zur PDF-Freigabe-Plattform von <strong>{{company_name}}</strong> eingeladen.</p>
+<p>Klicken Sie auf den folgenden Button, um Ihr Konto einzurichten. Der Link ist 7 Tage gültig.</p>
+<p><a href="{{invite_link}}" style="display:inline-block;padding:12px 32px;background:#4361ee;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">Konto einrichten</a></p>
+<p style="font-size:13px;color:#6b7280;">Falls der Button nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:<br>{{invite_link}}</p>
+<p>Mit freundlichen Grüßen<br>{{company_name}}</p>`,
+          `Sie wurden eingeladen\n\n{{invited_by}} hat Sie als {{role_label}} zur PDF-Freigabe-Plattform von {{company_name}} eingeladen.\n\nKonto einrichten: {{invite_link}}\n\nDer Link ist 7 Tage gültig.\n\nMit freundlichen Grüßen\n{{company_name}}`,
+          'Einladungs-E-Mail für neue Sachbearbeiter / Administratoren.'
+        );
     }
   } catch {}
 

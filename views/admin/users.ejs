@@ -7,9 +7,75 @@
   </div>
 </div>
 
-<!-- Neuen Benutzer anlegen -->
+<!-- Einladung versenden -->
 <div class="card mb-lg">
-  <h3>Neuen Sachbearbeiter anlegen</h3>
+  <h3>Mitarbeiter per E-Mail einladen</h3>
+  <p class="text-muted" style="margin-bottom:16px;font-size:0.875rem;">Der Eingeladene erhält eine E-Mail mit einem Link zum Einrichten seines Kontos (gültig 7 Tage).</p>
+  <form method="POST" action="/admin/users/invite" class="inline-form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="form-row">
+      <div class="form-group flex-2">
+        <label>E-Mail-Adresse</label>
+        <input type="email" name="email" required placeholder="mitarbeiter@firma.de">
+      </div>
+      <div class="form-group">
+        <label>Rolle</label>
+        <select name="role">
+          <option value="user">Sachbearbeiter</option>
+          <option value="admin">Administrator</option>
+        </select>
+      </div>
+      <div class="form-group form-action">
+        <button type="submit" class="btn btn-primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-2px;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Einladung senden
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Ausstehende Einladungen -->
+<% if (invitations && invitations.length > 0) { %>
+<div class="card mb-lg">
+  <h3>Ausstehende Einladungen</h3>
+  <div class="table-wrap" style="margin-top:12px;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>E-Mail</th>
+          <th>Rolle</th>
+          <th>Eingeladen von</th>
+          <th>Läuft ab</th>
+          <th>Aktionen</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% invitations.forEach(inv => { %>
+        <tr>
+          <td><%= inv.email %></td>
+          <td><span class="role-badge role-<%= inv.role %>"><%= inv.role === 'admin' ? 'Admin' : 'Bearbeiter' %></span></td>
+          <td class="text-muted"><%= inv.invited_by_name %></td>
+          <td class="text-muted"><%= new Date(inv.expires_at).toLocaleDateString('de-DE') %></td>
+          <td class="col-actions">
+            <form method="POST" action="/admin/users/invite/<%= inv.id %>/delete" style="display:inline" onsubmit="return confirm('Einladung zurückziehen?')">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn-icon btn-icon-danger" title="Einladung zurückziehen">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              </button>
+            </form>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } %>
+
+<!-- Neuen Benutzer direkt anlegen -->
+<div class="card mb-lg">
+  <h3>Benutzer direkt anlegen</h3>
   <form method="POST" action="/admin/users" class="inline-form">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <div class="form-row">
@@ -33,7 +99,7 @@
         </select>
       </div>
       <div class="form-group form-action">
-        <button type="submit" class="btn btn-primary">Anlegen</button>
+        <button type="submit" class="btn btn-ghost">Anlegen</button>
       </div>
     </div>
   </form>

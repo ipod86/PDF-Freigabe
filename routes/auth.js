@@ -4,6 +4,7 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const { getDb } = require('../database');
+const { validatePassword } = require('../security');
 
 router.get('/', (req, res) => {
   if (req.session.user) return res.redirect('/dashboard');
@@ -75,6 +76,50 @@ router.post('/login', (req, res) => {
       res.redirect('/dashboard');
     });
   });
+});
+
+router.get('/invite/:token', (req, res) => {
+  const db = getDb();
+  const invite = db.prepare("SELECT * FROM user_invitations WHERE token = ? AND expires_at > datetime('now','localtime')").get(req.params.token);
+  if (!invite) {
+    req.session.flash = { type: 'error', text: 'Einladungslink ungültig oder abgelaufen.' };
+    return res.redirect('/login');
+  }
+  res.render('invite', { title: 'Konto einrichten', invite });
+});
+
+router.post('/invite/:token', (req, res) => {
+  const db = getDb();
+  const invite = db.prepare("SELECT * FROM user_invitations WHERE token = ? AND expires_at > datetime('now','localtime')").get(req.params.token);
+  if (!invite) {
+    req.session.flash = { type: 'error', text: 'Einladungslink ungültig oder abgelaufen.' };
+    return res.redirect('/login');
+  }
+
+  const name     = (req.body.name || '').trim();
+  const password = req.body.password || '';
+
+  if (!name) {
+    req.session.flash = { type: 'error', text: 'Bitte geben Sie Ihren Namen ein.' };
+    return res.redirect(`/invite/${req.params.token}`);
+  }
+  const pwErr = validatePassword(password);
+  if (pwErr) {
+    req.session.flash = { type: 'error', text: pwErr };
+    return res.redirect(`/invite/${req.params.token}`);
+  }
+  if (db.prepare('SELECT id FROM users WHERE LOWER(email) = ?').get(invite.email.toLowerCase())) {
+    req.session.flash = { type: 'error', text: 'Für diese E-Mail existiert bereits ein Konto.' };
+    return res.redirect('/login');
+  }
+
+  const hash = bcrypt.hashSync(password, 12);
+  db.prepare('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)').run(name, invite.email, hash, invite.role);
+  db.prepare('DELETE FROM user_invitations WHERE id = ?').run(invite.id);
+
+  console.log(`[AUTH] Neues Konto über Einladung: ${invite.email} (${invite.role})`);
+  req.session.flash = { type: 'success', text: 'Konto erfolgreich eingerichtet. Bitte melden Sie sich an.' };
+  res.redirect('/login');
 });
 
 router.get('/logout', (req, res) => {

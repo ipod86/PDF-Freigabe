@@ -1,0 +1,29 @@
+<%- include('partials/header') %>
+
+<div class="login-page">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="login-icon">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <h1>Konto einrichten</h1>
+      <p>Sie wurden als <strong><%= invite.role === 'admin' ? 'Administrator' : 'Sachbearbeiter' %></strong> eingeladen.</p>
+      <p style="font-size:0.85rem;color:var(--muted);margin-top:4px;"><%= invite.email %></p>
+    </div>
+    <form method="POST" action="/invite/<%= invite.token %>" class="login-form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="form-group">
+        <label for="name">Ihr Name</label>
+        <input type="text" id="name" name="name" required autofocus placeholder="Max Mustermann">
+      </div>
+      <div class="form-group">
+        <label for="password">Passwort wählen</label>
+        <input type="password" id="password" name="password" required placeholder="Mindestens 8 Zeichen, inkl. Zahlen">
+        <small class="form-hint">Mindestens 8 Zeichen, Buchstaben und Zahlen.</small>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Konto einrichten</button>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

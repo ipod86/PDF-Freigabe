@@ -1,6 +1,7 @@
 // ─── routes/admin.js ─────────────────────────────────────────────────────────
 const router  = require('express').Router();
 const bcrypt  = require('bcryptjs');
+const crypto  = require('crypto');
 const multer  = require('multer');
 const path    = require('path');
 const fs      = require('fs');
@@ -9,6 +10,7 @@ const { execSync } = require('child_process');
 const { requireLogin, requireAdmin } = require('../middleware/auth');
 const { getDb } = require('../database');
 const { validatePassword, escapeLike } = require('../security');
+const { sendMail } = require('../mailer');
 
 // Alle Admin-Routen brauchen Login
 router.use(requireLogin);
@@ -39,7 +41,16 @@ router.get('/statistics', adminOnly, (req, res) => res.render('admin/statistics'
 // SACHBEARBEITER
 // ═══════════════════════════════════════════════════════════════════════════
 router.get('/users', adminOnly, (req, res) => {
-  res.render('admin/users', { title: 'Sachbearbeiter', users: getDb().prepare('SELECT * FROM users ORDER BY name').all() });
+  const db = getDb();
+  const users = db.prepare('SELECT * FROM users ORDER BY name').all();
+  const invitations = db.prepare(`
+    SELECT i.*, u.name AS invited_by_name
+    FROM user_invitations i
+    JOIN users u ON u.id = i.invited_by
+    WHERE i.expires_at > datetime('now','localtime')
+    ORDER BY i.created_at DESC
+  `).all();
+  res.render('admin/users', { title: 'Sachbearbeiter', users, invitations });
 });
 
 router.post('/users', adminOnly, (req, res) => {
@@ -75,6 +86,46 @@ router.post('/users/:id/delete', adminOnly, (req, res) => {
   const c = db.prepare('SELECT COUNT(*) AS c FROM jobs WHERE creator_id = ?').get(req.params.id).c;
   if (c > 0) { db.prepare('UPDATE users SET active=0 WHERE id=?').run(req.params.id); req.session.flash = { type: 'warn', text: `${c} Jobs vorhanden – deaktiviert.` }; }
   else { db.prepare('DELETE FROM users WHERE id=?').run(req.params.id); req.session.flash = { type: 'success', text: 'Gelöscht.' }; }
+  res.redirect('/admin/users');
+});
+
+router.post('/users/invite', adminOnly, async (req, res) => {
+  const db = getDb();
+  const { email, role } = req.body;
+  const trimmedEmail = (email || '').trim().toLowerCase();
+
+  if (!trimmedEmail) { req.session.flash = { type: 'error', text: 'E-Mail erforderlich.' }; return res.redirect('/admin/users'); }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) { req.session.flash = { type: 'error', text: 'Ungültige E-Mail-Adresse.' }; return res.redirect('/admin/users'); }
+  if (db.prepare('SELECT id FROM users WHERE LOWER(email) = ?').get(trimmedEmail)) {
+    req.session.flash = { type: 'error', text: 'Diese E-Mail ist bereits als Benutzer registriert.' };
+    return res.redirect('/admin/users');
+  }
+
+  // Bestehende Einladung für diese E-Mail ersetzen
+  db.prepare('DELETE FROM user_invitations WHERE email = ?').run(trimmedEmail);
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').slice(0, 19);
+  db.prepare('INSERT INTO user_invitations (email, role, token, invited_by, expires_at) VALUES (?, ?, ?, ?, ?)').run(trimmedEmail, role || 'user', token, req.session.user.id, expiresAt);
+
+  const baseUrl = (db.prepare('SELECT value FROM settings WHERE key=?').get('base_url')?.value || process.env.BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const sent = await sendMail('user_invite', trimmedEmail, {
+    invite_link: `${baseUrl}/invite/${token}`,
+    role_label: (role === 'admin') ? 'Administrator' : 'Sachbearbeiter',
+    invited_by: req.session.user.name,
+  });
+
+  if (sent) {
+    req.session.flash = { type: 'success', text: `Einladung an ${trimmedEmail} gesendet.` };
+  } else {
+    req.session.flash = { type: 'warn', text: `Einladung gespeichert, aber E-Mail konnte nicht gesendet werden. Link: ${baseUrl}/invite/${token}` };
+  }
+  res.redirect('/admin/users');
+});
+
+router.post('/users/invite/:id/delete', adminOnly, (req, res) => {
+  getDb().prepare('DELETE FROM user_invitations WHERE id = ?').run(req.params.id);
+  req.session.flash = { type: 'success', text: 'Einladung zurückgezogen.' };
   res.redirect('/admin/users');
 });
 
