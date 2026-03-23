@@ -1,0 +1,8 @@
+node_modules/
+data/
+uploads/
+backups/
+.env
+*.sqlite
+*.db
+public/uploads/logo/
