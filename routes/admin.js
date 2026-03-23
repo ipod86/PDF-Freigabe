@@ -162,7 +162,15 @@ router.post('/customers/:id/delete', (req, res) => {
 router.get('/customers/:id/contacts', (req, res) => {
   const db = getDb(); const customer = db.prepare('SELECT * FROM customers WHERE id=?').get(req.params.id);
   if (!customer) return res.redirect('/admin/customers');
-  res.render('admin/contacts', { title: `Ansprechpartner: ${customer.company}`, customer, contacts: db.prepare('SELECT * FROM contacts WHERE customer_id=? ORDER BY name').all(req.params.id) });
+  const contacts = db.prepare(`
+    SELECT c.*, cu.id AS portal_id, cu.name AS portal_name, cu.email AS portal_email,
+           cu.active AS portal_active, cu.last_login AS portal_last_login
+    FROM contacts c
+    LEFT JOIN customer_users cu ON cu.contact_id = c.id
+    WHERE c.customer_id = ?
+    ORDER BY c.name
+  `).all(req.params.id);
+  res.render('admin/contacts', { title: `Ansprechpartner: ${customer.company}`, customer, contacts });
 });
 
 router.post('/customers/:id/contacts', (req, res) => {
@@ -548,19 +556,57 @@ router.post('/customers/:id/portal-user', (req, res) => {
   res.redirect('/admin/customers');
 });
 
+// Portal-Zugang direkt von einem Kontakt anlegen
+router.post('/contacts/:id/portal-user', (req, res) => {
+  const db = getDb();
+  const contact = db.prepare('SELECT * FROM contacts WHERE id=?').get(req.params.id);
+  if (!contact) return res.redirect('/admin/customers');
+  const { email, name, password } = req.body;
+  if (!email || !name || !password) {
+    req.session.flash = { type: 'error', text: 'Alle Felder ausfüllen.' };
+    return res.redirect(`/admin/customers/${contact.customer_id}/contacts`);
+  }
+  const hash = bcrypt.hashSync(password, 12);
+  try {
+    db.prepare('INSERT INTO customer_users (customer_id, contact_id, email, password_hash, name) VALUES (?, ?, ?, ?, ?)').run(contact.customer_id, contact.id, email, hash, name);
+    req.session.flash = { type: 'success', text: `Portal-Zugang für "${name}" angelegt.` };
+  } catch (e) {
+    req.session.flash = { type: 'error', text: 'Fehler: ' + e.message };
+  }
+  res.redirect(`/admin/customers/${contact.customer_id}/contacts`);
+});
+
+router.post('/portal-users/:id/update', adminOnly, (req, res) => {
+  const db = getDb();
+  const pu = db.prepare('SELECT customer_id, contact_id FROM customer_users WHERE id=?').get(req.params.id);
+  if (!pu) return res.redirect('/admin/customers');
+  const { name, email } = req.body;
+  try {
+    db.prepare('UPDATE customer_users SET name=?, email=? WHERE id=?').run(name, email, req.params.id);
+    req.session.flash = { type: 'success', text: 'Portal-Zugang aktualisiert.' };
+  } catch (e) {
+    req.session.flash = { type: 'error', text: 'Fehler: ' + e.message };
+  }
+  res.redirect(pu.contact_id ? `/admin/customers/${pu.customer_id}/contacts` : '/admin/customers');
+});
+
 router.post('/portal-users/:id/delete', adminOnly, (req, res) => {
-  getDb().prepare('DELETE FROM customer_users WHERE id=?').run(req.params.id);
-  req.session.flash = { type: 'success', text: 'Portal-Benutzer gelöscht.' };
-  res.redirect('/admin/customers');
+  const db = getDb();
+  const pu = db.prepare('SELECT customer_id, contact_id FROM customer_users WHERE id=?').get(req.params.id);
+  db.prepare('DELETE FROM customer_users WHERE id=?').run(req.params.id);
+  req.session.flash = { type: 'success', text: 'Portal-Zugang gelöscht.' };
+  res.redirect(pu && pu.contact_id ? `/admin/customers/${pu.customer_id}/contacts` : '/admin/customers');
 });
 
 router.post('/portal-users/:id/reset-password', adminOnly, (req, res) => {
+  const db = getDb();
+  const pu = db.prepare('SELECT customer_id, contact_id FROM customer_users WHERE id=?').get(req.params.id);
   const { new_password } = req.body;
   if (!new_password) { req.session.flash = { type: 'error', text: 'Passwort eingeben.' }; return res.redirect('/admin/customers'); }
   const hash = bcrypt.hashSync(new_password, 12);
-  getDb().prepare('UPDATE customer_users SET password_hash=? WHERE id=?').run(hash, req.params.id);
+  db.prepare('UPDATE customer_users SET password_hash=? WHERE id=?').run(hash, req.params.id);
   req.session.flash = { type: 'success', text: 'Passwort zurückgesetzt.' };
-  res.redirect('/admin/customers');
+  res.redirect(pu && pu.contact_id ? `/admin/customers/${pu.customer_id}/contacts` : '/admin/customers');
 });
 
 module.exports = router;

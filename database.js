@@ -306,6 +306,9 @@ function initialize() {
   // Migration: email_sent → email_customer (alte Daten übernehmen)
   try { db.exec("UPDATE jobs SET email_customer = email_sent WHERE email_customer = 1 AND email_sent = 0"); } catch {}
 
+  // Migration: contact_id zu customer_users hinzufügen
+  try { db.exec("ALTER TABLE customer_users ADD COLUMN contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL"); } catch {}
+
   // Wiedervorlage-Template hinzufügen wenn noch nicht vorhanden
   try {
     const hasFollowup = db.prepare("SELECT id FROM mail_templates WHERE slug='followup_reminder'").get();
