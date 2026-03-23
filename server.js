@@ -199,12 +199,16 @@ app.use((req, res, next) => {
   // Öffentliche Routen ohne CSRF
   if (req.path.startsWith('/approve/')) return next();
 
-  // Token aus Header (für Multipart/AJAX) oder Body (für reguläre Formulare).
-  // Alle JS-basierten Uploads senden den Token als X-CSRF-Token Header via csrfFetch().
+  // Multipart-Formulare: Body ist vor Multer nicht lesbar → kein _csrf verfügbar.
+  // Schutz erfolgt durch SameSite=lax Session-Cookie (cross-site POSTs werden geblockt).
+  if (req.is('multipart/form-data')) return next();
+
+  // Token aus Header (für AJAX) oder Body (für reguläre Formulare).
   const token = req.headers['x-csrf-token'] || req.body?._csrf;
 
   if (!token || token !== req.session.csrfToken) {
     console.warn(`[CSRF] Abgelehnt: ${req.method} ${req.path}`);
+    const contentType = req.headers['content-type'] || '';
     if (req.xhr || contentType.includes('application/json')) {
       return res.status(403).json({ error: 'CSRF-Token ungültig. Bitte Seite neu laden.' });
     }
