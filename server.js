@@ -102,8 +102,8 @@ app.use(compression());
 // ═══════════════════════════════════════════════════════════════════════════
 // SECURITY: Body Parser mit strikten Limits
 // ═══════════════════════════════════════════════════════════════════════════
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb', parameterLimit: 50 }));
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb', parameterLimit: 50 }));
 app.use(cookieParser());
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -313,6 +313,7 @@ app.use('/approve',   approveLimiter, require('./routes/approve'));
 app.use('/admin',     require('./routes/admin'));
 app.use('/api',       require('./routes/api'));
 app.use('/webhooks',  require('./routes/webhooks'));
+app.use('/portal',    require('./routes/customer_portal'));
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SECURITY: 404 – keine Pfad-Informationen leaken

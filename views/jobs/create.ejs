@@ -11,6 +11,21 @@
   </a>
 </div>
 
+<% if (typeof jobTemplates !== 'undefined' && jobTemplates.length > 0) { %>
+<div class="card mb-lg" style="margin-bottom:20px;">
+  <h3 style="margin-bottom:12px;font-size:0.95rem;">Vorlage laden</h3>
+  <div style="display:flex;gap:10px;align-items:center;">
+    <select id="templateSelect" style="flex:1;">
+      <option value="">– Vorlage wählen –</option>
+      <% jobTemplates.forEach(t => { %>
+      <option value="<%= t.id %>" data-template='<%= JSON.stringify(t) %>'><%= t.name %><% if(t.customer_company){%> (<%= t.customer_company %>)<%}%></option>
+      <% }) %>
+    </select>
+    <button type="button" class="btn btn-ghost btn-sm" onclick="loadTemplate()">Laden</button>
+  </div>
+</div>
+<% } %>
+
 <form method="POST" action="/jobs/create" enctype="multipart/form-data" class="create-form">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
   <div class="form-grid">
@@ -39,6 +54,33 @@
           <option value="">– Erst Kunde wählen –</option>
         </select>
         <small class="form-hint" id="contact_email"></small>
+      </div>
+
+      <div class="form-group" id="additionalRecipientsGroup" style="display:none;">
+        <label>Weitere Empfänger</label>
+        <div id="additionalRecipientsList"></div>
+        <button type="button" class="btn btn-ghost btn-sm" id="addRecipientBtn" onclick="addRecipient()" style="margin-top:6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Weiteren Empfänger hinzufügen
+        </button>
+      </div>
+
+      <div class="form-group" id="approvalModeGroup" style="display:none;">
+        <label>Freigabe-Modus</label>
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" name="approval_mode" value="any" checked>
+            <span class="radio-text">
+              <strong>Einer reicht</strong> – Freigabe gilt sobald ein Empfänger zustimmt
+            </span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="approval_mode" value="all">
+            <span class="radio-text">
+              <strong>Alle müssen</strong> – Freigabe erst wenn alle Empfänger zugestimmt haben
+            </span>
+          </label>
+        </div>
       </div>
 
       <div class="form-group">
@@ -145,6 +187,45 @@
         <input type="text" id="access_password" name="access_password" placeholder="Leer = kein Passwort nötig">
         <small class="form-hint">Wenn gesetzt, muss der Kunde dieses Passwort eingeben, bevor er die Freigabe sehen kann.</small>
       </div>
+
+      <div class="form-group">
+        <label for="expires_at">Link gültig bis (optional)</label>
+        <input type="datetime-local" id="expires_at" name="expires_at">
+        <small class="form-hint">Nach diesem Datum ist der Freigabe-Link für den Kunden ungültig.</small>
+      </div>
+
+      <div class="form-group">
+        <label class="checkbox-label" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
+          <input type="checkbox" name="signature_required" value="1" id="signatureRequired">
+          <span>
+            <strong>Digitale Unterschrift erforderlich</strong><br>
+            <small class="text-muted">Kunde muss vor der Freigabe unterschreiben</small>
+          </span>
+        </label>
+      </div>
+
+      <% if (typeof customFields !== 'undefined' && customFields.length > 0) { %>
+      <div class="form-group">
+        <label>Zusatzfelder</label>
+        <% customFields.forEach(cf => { %>
+        <div style="margin-bottom:8px;">
+          <label style="font-size:0.85rem;font-weight:500;display:block;margin-bottom:2px;"><%= cf.name %><% if(cf.required){%> <span class="required">*</span><%}%></label>
+          <% if (cf.field_type === 'text' || cf.field_type === 'number' || cf.field_type === 'date') { %>
+          <input type="<%= cf.field_type %>" name="cf_<%= cf.field_key %>" <%= cf.required ? 'required' : '' %>>
+          <% } else if (cf.field_type === 'checkbox') { %>
+          <input type="checkbox" name="cf_<%= cf.field_key %>" value="1">
+          <% } else if (cf.field_type === 'select' && cf.options) { %>
+          <select name="cf_<%= cf.field_key %>" <%= cf.required ? 'required' : '' %>>
+            <option value="">– Bitte wählen –</option>
+            <% cf.options.split('\n').forEach(opt => { %>
+            <option value="<%= opt.trim() %>"><%= opt.trim() %></option>
+            <% }) %>
+          </select>
+          <% } %>
+        </div>
+        <% }) %>
+      </div>
+      <% } %>
     </div>
 
     <!-- Rechte Spalte -->
@@ -219,7 +300,71 @@ document.getElementById('contact_id').addEventListener('change', function() {
   const emailHint = document.getElementById('contact_email');
   const opt = this.options[this.selectedIndex];
   emailHint.textContent = opt && opt.dataset.email ? 'E-Mail: ' + opt.dataset.email : '';
+  updateAdditionalRecipientsVisibility();
 });
+
+// Multi-Empfänger
+let recipientCount = 0;
+let availableContacts = [];
+
+function updateAdditionalRecipientsVisibility() {
+  const custSel = document.getElementById('customer_id');
+  const group = document.getElementById('additionalRecipientsGroup');
+  group.style.display = custSel.value ? 'block' : 'none';
+}
+
+document.getElementById('customer_id').addEventListener('change', function() {
+  const option = this.options[this.selectedIndex];
+  availableContacts = JSON.parse(option.dataset.contacts || '[]');
+  // Clear extra recipients when customer changes
+  document.getElementById('additionalRecipientsList').innerHTML = '';
+  recipientCount = 0;
+  updateApprovalModeVisibility();
+});
+
+function addRecipient() {
+  const mainContactId = document.getElementById('contact_id').value;
+  const list = document.getElementById('additionalRecipientsList');
+  const idx = recipientCount++;
+  const div = document.createElement('div');
+  div.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px;';
+  div.id = 'extra-recipient-' + idx;
+
+  const sel = document.createElement('select');
+  sel.name = 'extra_contact_ids[]';
+  sel.style.flex = '1';
+  sel.innerHTML = '<option value="">– Ansprechpartner wählen –</option>';
+  availableContacts.forEach(c => {
+    if (String(c.id) !== String(mainContactId)) {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name + (c.email ? ' (' + c.email + ')' : '');
+      sel.appendChild(opt);
+    }
+  });
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'btn btn-ghost btn-sm';
+  removeBtn.style.flexShrink = '0';
+  removeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+  removeBtn.title = 'Entfernen';
+  removeBtn.onclick = function() {
+    div.remove();
+    updateApprovalModeVisibility();
+  };
+
+  div.appendChild(sel);
+  div.appendChild(removeBtn);
+  list.appendChild(div);
+  updateApprovalModeVisibility();
+}
+
+function updateApprovalModeVisibility() {
+  const extraSelects = document.querySelectorAll('select[name="extra_contact_ids[]"]');
+  const modeGroup = document.getElementById('approvalModeGroup');
+  modeGroup.style.display = extraSelects.length > 0 ? 'block' : 'none';
+}
 
 // Drag & Drop Upload (Multi-File, akkumulierend)
 const uploadArea = document.getElementById('uploadArea');
@@ -315,6 +460,28 @@ uploadArea.addEventListener('drop', e => {
   syncInput();
   renderFileList();
 });
+
+// Vorlage laden
+function loadTemplate() {
+  const sel = document.getElementById('templateSelect');
+  if (!sel || !sel.value) return;
+  const opt = sel.options[sel.selectedIndex];
+  const t = JSON.parse(opt.dataset.template || '{}');
+  if (t.job_name_prefix) document.getElementById('job_name').value = t.job_name_prefix + ' ';
+  if (t.description) document.getElementById('description').value = t.description;
+  if (t.internal_comment) document.getElementById('internal_comment').value = t.internal_comment;
+  if (t.visibility) {
+    document.querySelectorAll('input[name="visibility"]').forEach(r => r.checked = r.value === t.visibility);
+  }
+  if (t.hasOwnProperty('email_customer')) document.getElementById('emailCustomer').checked = !!t.email_customer;
+  if (t.hasOwnProperty('email_creator')) document.getElementById('emailCreator').checked = !!t.email_creator;
+  if (t.hasOwnProperty('no_reminder')) document.getElementById('noReminder').checked = !!t.no_reminder;
+  if (t.customer_id) {
+    const custSel = document.getElementById('customer_id');
+    if (custSel) { custSel.value = t.customer_id; custSel.dispatchEvent(new Event('change')); }
+  }
+  updateEmailHints();
+}
 
 // Doppel-Submit verhindern
 document.querySelector('.create-form').addEventListener('submit', function() {

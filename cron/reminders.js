@@ -1,5 +1,5 @@
 // ─── cron/reminders.js ───────────────────────────────────────────────────────
-// Automatisches Mahnwesen + Wiedervorlagen
+// Automatisches Mahnwesen + Wiedervorlagen + Auto-Archivierung + Auto-Löschung
 // Ausführen: node cron/reminders.js (oder per Cronjob)
 // ──────────────────────────────────────────────────────────────────────────────
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
@@ -10,11 +10,14 @@ async function run() {
   initialize();
   const db = getDb();
 
-  const reminderDays = parseInt(
-    (db.prepare("SELECT value FROM settings WHERE key='reminder_days'").get() || {}).value || '3'
+  const firstDays = parseInt(
+    (db.prepare("SELECT value FROM settings WHERE key='reminder_first_days'").get() || {}).value || '3'
   );
-  const maxReminders = parseInt(
-    (db.prepare("SELECT value FROM settings WHERE key='max_reminders'").get() || {}).value || '3'
+  const intervalDays = parseInt(
+    (db.prepare("SELECT value FROM settings WHERE key='reminder_interval_days'").get() || {}).value || '1'
+  );
+  const maxCount = parseInt(
+    (db.prepare("SELECT value FROM settings WHERE key='reminder_max_count'").get() || {}).value || '3'
   );
 
   let baseUrl;
@@ -36,13 +39,14 @@ async function run() {
     WHERE j.status = 'pending'
       AND j.email_customer = 1
       AND j.no_reminder = 0
+      AND j.archived = 0
       AND j.reminder_count < ?
       AND (
-        (j.reminder_sent_at IS NULL AND julianday('now') - julianday(j.created_at) >= ?)
+        (j.reminder_count = 0 AND julianday('now') - julianday(j.created_at) >= ?)
         OR
-        (j.reminder_sent_at IS NOT NULL AND julianday('now') - julianday(j.reminder_sent_at) >= ?)
+        (j.reminder_count > 0 AND julianday('now') - julianday(j.reminder_sent_at) >= ?)
       )
-  `).all(maxReminders, reminderDays, reminderDays);
+  `).all(maxCount, firstDays, intervalDays);
 
   console.log(`[REMINDER] ${pendingJobs.length} Kunden-Erinnerungen fällig`);
 
@@ -116,6 +120,43 @@ async function run() {
     db.prepare(`UPDATE jobs SET followup_date = NULL WHERE id = ?`).run(job.id);
     db.prepare(`INSERT INTO audit_log (job_id, user_id, action, details) VALUES (?, ?, 'followup_triggered', ?)`).run(job.id, job.creator_id, `Wiedervorlage ausgelöst${job.followup_note ? ': ' + job.followup_note : ''}`);
     console.log(`[FOLLOWUP] → ${job.creator_name}: "${job.job_name}"`);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 3. AUTO-ARCHIVIERUNG
+  // ═══════════════════════════════════════════════════════════════════════════
+  const autoArchiveMonths = parseInt(db.prepare("SELECT value FROM settings WHERE key='auto_archive_months'").get()?.value || '0');
+  if (autoArchiveMonths > 0) {
+    const archived = db.prepare(`
+      UPDATE jobs SET archived=1, archived_at=datetime('now','localtime')
+      WHERE archived=0 AND status != 'pending'
+      AND julianday('now') - julianday(created_at) >= ?
+    `).run(autoArchiveMonths * 30);
+    if (archived.changes > 0) console.log(`[CLEANUP] ${archived.changes} Jobs archiviert`);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 4. AUTO-LÖSCHUNG archivierter Jobs
+  // ═══════════════════════════════════════════════════════════════════════════
+  const autoDeleteMonths = parseInt(db.prepare("SELECT value FROM settings WHERE key='auto_delete_months'").get()?.value || '0');
+  if (autoDeleteMonths > 0) {
+    const toDelete = db.prepare(`
+      SELECT id FROM jobs WHERE archived=1
+      AND julianday('now') - julianday(archived_at) >= ?
+    `).all(autoDeleteMonths * 30);
+
+    const UPLOAD_DIR = process.env.UPLOAD_DIR || require('path').join(__dirname, '..', 'uploads');
+    const fs = require('fs');
+
+    for (const job of toDelete) {
+      const versions = db.prepare('SELECT stored_name FROM job_versions WHERE job_id = ?').all(job.id);
+      for (const v of versions) {
+        const fp = require('path').join(UPLOAD_DIR, v.stored_name);
+        try { if (fs.existsSync(fp)) fs.unlinkSync(fp); } catch {}
+      }
+      db.prepare('DELETE FROM jobs WHERE id = ?').run(job.id);
+    }
+    if (toDelete.length > 0) console.log(`[CLEANUP] ${toDelete.length} Jobs gelöscht`);
   }
 
   console.log('[CRON] Fertig');

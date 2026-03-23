@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meine Freigaben – <%= companyName %></title>
+  <% if (typeof companyLogo !== 'undefined' && companyLogo) { %><link rel="icon" href="/uploads/logo/<%= companyLogo %>"><% } else { %><link rel="icon" type="image/svg+xml" href="/img/favicon.svg"><% } %>
+  <link rel="stylesheet" href="/css/fonts.css?v=1">
+  <link rel="stylesheet" href="/css/style.css?v=1">
+  <style>
+    :root { --brand: <%= typeof primaryColor !== 'undefined' ? primaryColor : '#4361ee' %>; }
+    .portal-header { background: var(--brand); color: #fff; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 60px; position: sticky; top: 0; z-index: 100; }
+    .portal-header-brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 1rem; }
+    .portal-header-brand img { max-height: 28px; }
+    .portal-header-user { font-size: 0.85rem; opacity: 0.9; }
+    .portal-main { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+    .portal-welcome { margin-bottom: 28px; }
+    .portal-welcome h1 { font-size: 1.5rem; font-weight: 700; color: var(--text); }
+    .portal-welcome p { color: var(--text-muted); }
+    .status-badge-portal { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+    .badge-pending { background: rgba(245,158,11,0.12); color: #d97706; }
+    .badge-approved { background: rgba(16,185,129,0.12); color: #059669; }
+    .badge-rejected { background: rgba(239,68,68,0.12); color: #dc2626; }
+    .job-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 12px; display: flex; align-items: center; gap: 20px; }
+    .job-card:hover { border-color: var(--brand); box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+    .job-card-info { flex: 1; min-width: 0; }
+    .job-card-name { font-weight: 600; font-size: 1rem; color: var(--text); margin-bottom: 4px; }
+    .job-card-meta { font-size: 0.82rem; color: var(--text-muted); }
+    .job-card-action { flex-shrink: 0; }
+    .btn-portal { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: var(--brand); color: #fff; border-radius: var(--radius); text-decoration: none; font-size: 0.85rem; font-weight: 600; }
+    .btn-portal:hover { filter: brightness(0.9); color: #fff; }
+    .empty-portal { text-align: center; padding: 60px 24px; color: var(--text-muted); }
+  </style>
+</head>
+<body style="background:var(--bg);margin:0;">
+  <header class="portal-header">
+    <div class="portal-header-brand">
+      <% if (typeof companyLogo !== 'undefined' && companyLogo) { %>
+      <img src="/uploads/logo/<%= companyLogo %>" alt="<%= companyName %>">
+      <% } else { %>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <% } %>
+      <span>Kunden-Portal</span>
+    </div>
+    <div class="portal-header-user">
+      <span><%= customerUser.name %> (<%= customer ? customer.company : '' %>)</span>
+      &nbsp;·&nbsp;
+      <a href="/portal/logout" style="color:#fff;opacity:0.8;text-decoration:underline;font-size:0.82rem;">Abmelden</a>
+    </div>
+  </header>
+
+  <main class="portal-main">
+    <div class="portal-welcome">
+      <h1>Meine Freigaben</h1>
+      <p>Hier sehen Sie alle aktuellen Freigabeanfragen von <%= companyName %>.</p>
+    </div>
+
+    <% if (jobs.length === 0) { %>
+    <div class="empty-portal">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <p style="margin-top:16px;">Keine offenen Freigaben vorhanden.</p>
+    </div>
+    <% } else { %>
+    <% jobs.forEach(job => { %>
+    <div class="job-card">
+      <div>
+        <%
+          const statusMap = { pending: { cls: 'badge-pending', label: 'Offen' }, approved: { cls: 'badge-approved', label: 'Freigegeben' }, rejected: { cls: 'badge-rejected', label: 'Abgelehnt' } };
+          const s = statusMap[job.status] || { cls: 'badge-pending', label: job.status };
+        %>
+        <span class="status-badge-portal <%= s.cls %>">
+          <span class="status-dot status-<%= job.status %>"></span>
+          <%= s.label %>
+        </span>
+      </div>
+      <div class="job-card-info">
+        <div class="job-card-name"><%= job.job_name %></div>
+        <div class="job-card-meta">
+          Erstellt am <%= new Date(job.created_at).toLocaleDateString('de-DE') %> · Sachbearbeiter: <%= job.creator_name %>
+          <% if (job.due_date) { %> · Fällig bis: <strong><%= new Date(job.due_date).toLocaleDateString('de-DE') %></strong><% } %>
+        </div>
+      </div>
+      <div class="job-card-action">
+        <a href="<%= baseUrl %>/approve/<%= job.access_token %>" class="btn-portal" target="_blank">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <% if (job.status === 'pending') { %>Zur Freigabe<% } else { %>Ansehen<% } %>
+        </a>
+      </div>
+    </div>
+    <% }) %>
+    <% } %>
+  </main>
+
+  <footer style="text-align:center;padding:20px;font-size:0.78rem;color:var(--text-muted);">
+    <%= companyName %> · <a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a>
+  </footer>
+</body>
+</html>

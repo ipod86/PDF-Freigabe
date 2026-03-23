@@ -3,6 +3,8 @@ const router  = require('express').Router();
 const bcrypt  = require('bcryptjs');
 const { requireLogin } = require('../middleware/auth');
 const { getDb } = require('../database');
+let QRCode;
+try { QRCode = require('qrcode'); } catch {}
 
 // Health Check
 router.get('/health', (req, res) => {
@@ -201,6 +203,58 @@ router.post('/email-test', requireLogin, async (req, res) => {
     res.json({ success: true, messageId: info.messageId });
   } catch (err) {
     res.json({ success: false, error: err.message });
+  }
+});
+
+// Dateireihenfolge speichern (Drag & Drop)
+router.post('/jobs/:uuid/files/reorder', requireLogin, (req, res) => {
+  const db = getDb();
+  const job = db.prepare('SELECT * FROM jobs WHERE uuid = ?').get(req.params.uuid);
+  if (!job) return res.status(404).json({ error: 'Nicht gefunden' });
+
+  const { order } = req.body;
+  if (!Array.isArray(order)) return res.status(400).json({ error: 'Ungültig' });
+
+  const update = db.prepare('UPDATE job_files SET sort_order = ? WHERE id = ? AND job_id = ?');
+  const txn = db.transaction(() => {
+    order.forEach((fileId, idx) => {
+      update.run(idx + 1, parseInt(fileId), job.id);
+    });
+  });
+  txn();
+
+  res.json({ success: true });
+});
+
+// QR-Code für Freigabe-Link
+router.get('/qr/:token', requireLogin, async (req, res) => {
+  if (!QRCode) return res.status(503).json({ error: 'QR-Code-Modul nicht verfügbar' });
+  const db = getDb();
+  const job = db.prepare('SELECT access_token FROM jobs WHERE access_token = ?').get(req.params.token);
+  if (!job) return res.status(404).json({ error: 'Nicht gefunden' });
+
+  let baseUrl;
+  try { baseUrl = db.prepare("SELECT value FROM settings WHERE key='base_url'").get()?.value; } catch {}
+  baseUrl = baseUrl || process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+
+  const url = `${baseUrl}/approve/${req.params.token}`;
+  const dataUrl = await QRCode.toDataURL(url, { width: 200, margin: 1 });
+  res.json({ qrCode: dataUrl, url });
+});
+
+// Job-Vorlagen abrufen (für Create-Formular)
+router.get('/job-templates', requireLogin, (req, res) => {
+  const db = getDb();
+  try {
+    const templates = db.prepare(`
+      SELECT jt.*, c.company AS customer_company
+      FROM job_templates jt
+      LEFT JOIN customers c ON c.id = jt.customer_id
+      ORDER BY jt.name
+    `).all();
+    res.json(templates);
+  } catch {
+    res.json([]);
   }
 });
 

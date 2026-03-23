@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kunden-Portal – <%= companyName %></title>
+  <% if (typeof companyLogo !== 'undefined' && companyLogo) { %><link rel="icon" href="/uploads/logo/<%= companyLogo %>"><% } else { %><link rel="icon" type="image/svg+xml" href="/img/favicon.svg"><% } %>
+  <link rel="stylesheet" href="/css/fonts.css?v=1">
+  <link rel="stylesheet" href="/css/style.css?v=1">
+  <style>
+    body { background: var(--bg); display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .portal-login { background: #fff; border-radius: 12px; padding: 40px; width: 90%; max-width: 400px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+    .portal-logo { text-align: center; margin-bottom: 28px; }
+    .portal-logo img { max-height: 48px; }
+    .portal-title { text-align: center; font-size: 1.3rem; font-weight: 700; margin-bottom: 4px; }
+    .portal-subtitle { text-align: center; color: var(--text-muted); font-size: 0.88rem; margin-bottom: 28px; }
+    :root { --brand: <%= typeof primaryColor !== 'undefined' ? primaryColor : '#4361ee' %>; }
+    .btn-brand { background: var(--brand); color: #fff; border: none; border-radius: var(--radius); padding: 12px; width: 100%; font-weight: 600; font-size: 0.95rem; cursor: pointer; margin-top: 8px; }
+    .btn-brand:hover { filter: brightness(0.9); }
+    .error-msg { background: rgba(239,68,68,0.08); color: #dc2626; border-radius: var(--radius); padding: 10px 14px; font-size: 0.88rem; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <div class="portal-login">
+    <div class="portal-logo">
+      <% if (typeof companyLogo !== 'undefined' && companyLogo) { %>
+      <img src="/uploads/logo/<%= companyLogo %>" alt="<%= companyName %>">
+      <% } else { %>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="<%= primaryColor %>" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <% } %>
+    </div>
+    <div class="portal-title">Kunden-Portal</div>
+    <div class="portal-subtitle"><%= companyName %></div>
+
+    <% if (error) { %>
+    <div class="error-msg">E-Mail oder Passwort falsch. Bitte erneut versuchen.</div>
+    <% } %>
+
+    <form method="POST" action="/portal/login">
+      <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+      <div class="form-group">
+        <label for="email">E-Mail-Adresse</label>
+        <input type="email" id="email" name="email" required autofocus placeholder="ihre@email.de">
+      </div>
+      <div class="form-group">
+        <label for="password">Passwort</label>
+        <input type="password" id="password" name="password" required placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn-brand">Anmelden</button>
+    </form>
+  </div>
+</body>
+</html>

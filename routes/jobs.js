@@ -48,7 +48,15 @@ router.get('/create', requireLogin, (req, res) => {
     });
   });
 
-  res.render('jobs/create', { title: 'Freigabe erstellen', customers });
+  // Custom Fields laden
+  let customFields = [];
+  try { customFields = db.prepare('SELECT * FROM custom_fields WHERE active=1 ORDER BY sort_order').all(); } catch {}
+
+  // Job-Vorlagen laden
+  let jobTemplates = [];
+  try { jobTemplates = db.prepare(`SELECT jt.*, c.company AS customer_company FROM job_templates jt LEFT JOIN customers c ON c.id=jt.customer_id ORDER BY jt.name`).all(); } catch {}
+
+  res.render('jobs/create', { title: 'Freigabe erstellen', customers, customFields, jobTemplates });
 });
 
 // ─── Freigabe speichern ─────────────────────────────────────────────────────
@@ -98,10 +106,13 @@ router.post('/create', requireLogin, (req, res, next) => {
       const dueDate       = req.body.due_date || null;
       const followupDate  = req.body.followup_date || null;
       const followupNote  = req.body.followup_note || null;
+      const expiresAt     = req.body.expires_at || null;
+      const signatureRequired = req.body.signature_required === '1' ? 1 : 0;
+      const approvalMode  = req.body.approval_mode || 'any';
 
   const result = db.prepare(`
-    INSERT INTO jobs (uuid, creator_id, customer_id, contact_id, job_name, description, internal_comment, visibility, access_token, access_password, email_customer, email_creator, no_reminder, due_date, followup_date, followup_note)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO jobs (uuid, creator_id, customer_id, contact_id, job_name, description, internal_comment, visibility, access_token, access_password, email_customer, email_creator, no_reminder, due_date, followup_date, followup_note, expires_at, signature_required, approval_mode)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     jobUuid,
     req.session.user.id,
@@ -118,7 +129,10 @@ router.post('/create', requireLogin, (req, res, next) => {
     noReminder,
     dueDate,
     followupDate,
-    followupNote
+    followupNote,
+    expiresAt,
+    signatureRequired,
+    approvalMode
   );
 
   const jobId = result.lastInsertRowid;
@@ -139,6 +153,18 @@ router.post('/create', requireLogin, (req, res, next) => {
     insertFile.run(jobId, file.originalname, file.filename, file.size, i + 1);
   });
 
+  // Custom Field Values speichern
+  try {
+    const cfInsert = db.prepare('INSERT OR REPLACE INTO job_custom_values (job_id, field_id, value) VALUES (?, ?, ?)');
+    const allCf = db.prepare('SELECT * FROM custom_fields WHERE active=1').all();
+    for (const cf of allCf) {
+      const val = req.body['cf_' + cf.field_key];
+      if (val !== undefined && val !== '') {
+        cfInsert.run(jobId, cf.id, val);
+      }
+    }
+  } catch {}
+
   // Audit-Log
   db.prepare(`
     INSERT INTO audit_log (job_id, user_id, action, details)
@@ -152,6 +178,40 @@ router.post('/create', requireLogin, (req, res, next) => {
     baseUrl = (bRow && bRow.value) ? bRow.value : (process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`);
   } catch { baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`; }
   const approvalLink = `${baseUrl}/approve/${accessToken}`;
+
+  // Weitere Empfänger (job_recipients) speichern
+  try {
+    const extraContactIds = [].concat(req.body.extra_contact_ids || []).map(Number).filter(Boolean);
+    if (extraContactIds.length > 0) {
+      const insertRecipient = db.prepare(`
+        INSERT INTO job_recipients (job_id, contact_id, access_token, status)
+        VALUES (?, ?, ?, 'pending')
+      `);
+      for (const cId of extraContactIds) {
+        const recipToken = uuidv4();
+        insertRecipient.run(jobId, cId, recipToken);
+        // Mail an zusätzlichen Empfänger senden
+        if (emailCustomer) {
+          const rContact = db.prepare('SELECT * FROM contacts WHERE id = ?').get(cId);
+          if (rContact) {
+            const recipLink = `${baseUrl}/approve/${recipToken}`;
+            sendMailByEvent('approval_created', { customer: rContact.email, creator: null }, {
+              contact_name: rContact.name,
+              job_name,
+              description: description || '',
+              due_date: dueDate ? new Date(dueDate).toLocaleDateString('de-DE') : '',
+              access_password: accessPw || '',
+              approval_link: recipLink,
+              creator_name: req.session.user.name,
+              creator_email: req.session.user.email,
+            });
+          }
+        }
+      }
+    }
+  } catch (recipErr) {
+    console.error('[JOBS] Fehler beim Speichern weiterer Empfänger:', recipErr.message);
+  }
 
   // Mail senden (basierend auf Einstellungen)
   const contact = db.prepare('SELECT * FROM contacts WHERE id = ?').get(parseInt(contact_id));
@@ -247,7 +307,31 @@ router.get('/:uuid', requireLogin, (req, res) => {
     });
   } catch {}
 
-  res.render('jobs/detail', { title: job.job_name, job, versions, logs, files, allFiles });
+  // Custom Field Values laden
+  let customFieldValues = [];
+  try {
+    customFieldValues = db.prepare(`
+      SELECT cf.name, cf.field_type, jcv.value
+      FROM job_custom_values jcv
+      JOIN custom_fields cf ON cf.id = jcv.field_id
+      WHERE jcv.job_id = ? AND jcv.value IS NOT NULL AND jcv.value != ''
+      ORDER BY cf.sort_order
+    `).all(job.id);
+  } catch {}
+
+  // Unterschrift laden (falls vorhanden)
+  let jobSignature = null;
+  try { jobSignature = db.prepare('SELECT * FROM job_signatures WHERE job_id = ? ORDER BY signed_at DESC LIMIT 1').get(job.id); } catch {}
+
+  // Weitere Empfänger laden
+  let jobRecipients = [];
+  try { jobRecipients = db.prepare('SELECT jr.*, co.name AS contact_name FROM job_recipients jr JOIN contacts co ON co.id=jr.contact_id WHERE jr.job_id=? ORDER BY jr.created_at').all(job.id); } catch {}
+
+  // BaseURL für Links
+  let baseUrl = '';
+  try { baseUrl = db.prepare("SELECT value FROM settings WHERE key='base_url'").get()?.value || ''; } catch {}
+
+  res.render('jobs/detail', { title: job.job_name, job, versions, logs, files, allFiles, customFieldValues, jobSignature, jobRecipients, baseUrl });
 });
 
 // ─── Neue Version: Formularseite ────────────────────────────────────────────
@@ -572,8 +656,9 @@ router.post('/bulk/delete', requireLogin, (req, res) => {
     deleted++;
   }
 
+  const redirectTab = req.body.tab === 'archive' ? '?tab=archive' : '';
   req.session.flash = { type: 'success', text: `${deleted} Freigabe(n) gelöscht.` };
-  res.redirect('/dashboard');
+  res.redirect('/dashboard' + redirectTab);
 });
 
 // ─── Bulk: Status zurücksetzen (Erneut senden) ─────────────────────────────
@@ -617,6 +702,34 @@ router.post('/bulk/resend', requireLogin, (req, res) => {
   }
 
   req.session.flash = { type: 'success', text: `${sent} Mail(s) erneut gesendet.` };
+  res.redirect('/dashboard');
+});
+
+// ─── Job archivieren ────────────────────────────────────────────────────────
+router.post('/:uuid/archive', requireLogin, (req, res) => {
+  const db = getDb();
+  const job = db.prepare('SELECT * FROM jobs WHERE uuid = ?').get(req.params.uuid);
+  if (!job) {
+    req.session.flash = { type: 'error', text: 'Job nicht gefunden.' };
+    return res.redirect('/dashboard');
+  }
+  db.prepare(`UPDATE jobs SET archived=1, archived_at=datetime('now','localtime'), updated_at=datetime('now','localtime') WHERE id=?`).run(job.id);
+  db.prepare(`INSERT INTO audit_log (job_id, user_id, action, details) VALUES (?, ?, 'archived', 'Job archiviert')`).run(job.id, req.session.user.id);
+  req.session.flash = { type: 'success', text: 'Job archiviert.' };
+  res.redirect('/dashboard');
+});
+
+// ─── Job aus Archiv zurückholen ──────────────────────────────────────────────
+router.post('/:uuid/unarchive', requireLogin, (req, res) => {
+  const db = getDb();
+  const job = db.prepare('SELECT * FROM jobs WHERE uuid = ?').get(req.params.uuid);
+  if (!job) {
+    req.session.flash = { type: 'error', text: 'Job nicht gefunden.' };
+    return res.redirect('/dashboard?tab=archive');
+  }
+  db.prepare(`UPDATE jobs SET archived=0, archived_at=NULL, updated_at=datetime('now','localtime') WHERE id=?`).run(job.id);
+  db.prepare(`INSERT INTO audit_log (job_id, user_id, action, details) VALUES (?, ?, 'unarchived', 'Job aus Archiv zurückgeholt')`).run(job.id, req.session.user.id);
+  req.session.flash = { type: 'success', text: 'Job aus Archiv zurückgeholt.' };
   res.redirect('/dashboard');
 });
 

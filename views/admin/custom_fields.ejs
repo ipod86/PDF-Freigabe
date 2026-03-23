@@ -1,0 +1,98 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Benutzerdefinierte Felder</h1>
+    <p class="page-subtitle">Zusätzliche Felder für Freigabe-Jobs</p>
+  </div>
+</div>
+
+<div class="card mb-lg">
+  <h3>Neues Feld anlegen</h3>
+  <form method="POST" action="/admin/custom-fields">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="form-row">
+      <div class="form-group flex-2">
+        <label>Feldname <span class="required">*</span></label>
+        <input type="text" name="name" required placeholder="z.B. Bestellnummer">
+      </div>
+      <div class="form-group">
+        <label>Typ</label>
+        <select name="field_type">
+          <option value="text">Text</option>
+          <option value="number">Zahl</option>
+          <option value="date">Datum</option>
+          <option value="select">Auswahl</option>
+          <option value="checkbox">Checkbox</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Reihenfolge</label>
+        <input type="number" name="sort_order" value="0" min="0" style="width:80px;">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group flex-2">
+        <label>Optionen (für Typ "Auswahl", eine pro Zeile)</label>
+        <textarea name="options" rows="3" placeholder="Option 1&#10;Option 2&#10;Option 3"></textarea>
+      </div>
+      <div class="form-group">
+        <label>&nbsp;</label>
+        <label class="checkbox-label"><input type="checkbox" name="required" value="1"> Pflichtfeld</label>
+      </div>
+      <div class="form-group form-action">
+        <button type="submit" class="btn btn-primary">Anlegen</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="table-wrap">
+  <% if (fields.length === 0) { %>
+  <div class="empty-state">
+    <p>Noch keine Felder angelegt.</p>
+  </div>
+  <% } else { %>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Schlüssel</th>
+        <th>Typ</th>
+        <th>Pflicht</th>
+        <th>Reihenfolge</th>
+        <th>Status</th>
+        <th>Aktionen</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% fields.forEach(f => { %>
+      <tr class="<%= !f.active ? 'row-inactive' : '' %>">
+        <td><strong><%= f.name %></strong></td>
+        <td><code style="font-size:0.8rem;"><%= f.field_key %></code></td>
+        <td><%= f.field_type %></td>
+        <td><%= f.required ? 'Ja' : 'Nein' %></td>
+        <td><%= f.sort_order %></td>
+        <td><span class="status-badge <%= f.active ? 'badge-active' : 'badge-inactive' %>"><%= f.active ? 'Aktiv' : 'Inaktiv' %></span></td>
+        <td class="col-actions">
+          <form method="POST" action="/admin/custom-fields/<%= f.id %>/toggle" style="display:inline">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn-icon" title="<%= f.active ? 'Deaktivieren' : 'Aktivieren' %>">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></svg>
+            </button>
+          </form>
+          <form method="POST" action="/admin/custom-fields/<%= f.id %>/delete" style="display:inline" onsubmit="return confirm('Feld &quot;<%= f.name %>&quot; löschen? Alle gespeicherten Werte gehen verloren.')">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn-icon btn-icon-danger" title="Löschen">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </form>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

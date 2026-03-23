@@ -158,6 +158,45 @@ function generateProtocol(jobId, outputStream) {
     });
   }
 
+  // ─── Digitale Unterschrift (falls vorhanden) ───────────────────────────
+  if (job.signature_required) {
+    let signature = null;
+    try {
+      signature = db.prepare('SELECT * FROM job_signatures WHERE job_id = ? ORDER BY signed_at DESC LIMIT 1').get(jobId);
+    } catch {}
+
+    if (signature) {
+      doc.moveDown(1);
+      if (doc.y > 650) { doc.addPage(); }
+      doc.fontSize(13).font('Helvetica-Bold').fillColor('#1a1d26').text('Digitale Unterschrift', 50);
+      doc.moveDown(0.4);
+
+      const sigInfo = [];
+      if (signature.signer_name) sigInfo.push(['Unterzeichnet von', signature.signer_name]);
+      sigInfo.push(['Unterzeichnet am', signature.signed_at ? new Date(signature.signed_at).toLocaleString('de-DE') : '–']);
+
+      sigInfo.forEach(([label, value]) => {
+        const y = doc.y;
+        doc.fontSize(9).font('Helvetica-Bold').fillColor(grayColor).text(label, 50, y, { width: 140 });
+        doc.fontSize(9).font('Helvetica').fillColor('#1a1d26').text(value, 195, y, { width: 350 });
+        doc.y = Math.max(doc.y, y + 16);
+      });
+
+      // Unterschriftsbild einbetten
+      if (signature.signature_data && signature.signature_data.startsWith('data:image/png;base64,')) {
+        try {
+          const base64Data = signature.signature_data.replace('data:image/png;base64,', '');
+          const imgBuffer = Buffer.from(base64Data, 'base64');
+          doc.moveDown(0.5);
+          const imgY = doc.y;
+          doc.roundedRect(50, imgY, 300, 90, 4).strokeColor('#e2e5ec').lineWidth(1).stroke();
+          doc.image(imgBuffer, 55, imgY + 5, { width: 290, height: 80, fit: [290, 80] });
+          doc.y = imgY + 100;
+        } catch {}
+      }
+    }
+  }
+
   // ─── Versionshistorie ───────────────────────────────────────────────────
   if (versions.length > 0) {
     doc.moveDown(1);

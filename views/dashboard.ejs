@@ -47,14 +47,21 @@
 <div class="filter-bar">
   <form method="GET" class="filter-form">
     <div class="filter-tabs">
+      <% if (tab !== 'archive') { %>
       <a href="/dashboard" class="filter-tab <%= filter === 'all' ? 'active' : '' %>">Alle</a>
       <a href="/dashboard?status=pending" class="filter-tab tab-pending <%= filter === 'pending' ? 'active' : '' %>">Offen</a>
       <a href="/dashboard?status=approved" class="filter-tab tab-approved <%= filter === 'approved' ? 'active' : '' %>">Freigegeben</a>
       <a href="/dashboard?status=rejected" class="filter-tab tab-rejected <%= filter === 'rejected' ? 'active' : '' %>">Abgelehnt</a>
+      <% } %>
+      <a href="/dashboard?tab=archive" class="filter-tab <%= tab === 'archive' ? 'active' : '' %>" style="margin-left:<%= tab !== 'archive' ? 'auto' : '0' %>;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+        Archiv
+      </a>
     </div>
     <div class="search-box">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="text" name="q" placeholder="Suchen..." value="<%= search %>"<% if(filter !== 'all') { %> data-status="<%= filter %>"<% } %>>
+      <input type="text" name="q" placeholder="Suchen..." value="<%= search %>">
+      <% if (tab === 'archive') { %><input type="hidden" name="tab" value="archive"><% } %>
     </div>
   </form>
 </div>
@@ -62,6 +69,7 @@
 <!-- Tabelle -->
 <form id="bulkForm" method="POST">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <% if (tab === 'archive') { %><input type="hidden" name="tab" value="archive"><% } %>
 
   <!-- Bulk-Aktionsleiste (erscheint bei Auswahl) -->
   <div class="bulk-bar" id="bulkBar" style="display:none;">
@@ -93,7 +101,7 @@
           <th class="col-check"><input type="checkbox" id="selectAll" title="Alle auswählen"></th>
           <th class="col-status">Status</th>
           <th class="col-hide-mobile">Erstellt</th>
-          <th>Fällig</th>
+          <th><%= tab === 'archive' ? 'Archiviert am' : 'Fällig' %></th>
           <th class="col-hide-mobile">Ersteller</th>
           <th>Empfänger</th>
           <th>Job-Name</th>
@@ -125,10 +133,18 @@
           </td>
           <td class="text-muted col-hide-mobile"><%= new Date(job.created_at).toLocaleDateString('de-DE') %></td>
           <td>
-            <% if (job.due_date) { %>
-            <span class="due-badge <%= dueClass %>"><%= new Date(job.due_date).toLocaleDateString('de-DE') %></span>
+            <% if (tab === 'archive') { %>
+              <% if (job.archived_at) { %>
+              <span class="text-muted"><%= new Date(job.archived_at).toLocaleDateString('de-DE') %></span>
+              <% } else { %>
+              <span class="text-muted">–</span>
+              <% } %>
             <% } else { %>
-            <span class="text-muted">–</span>
+              <% if (job.due_date) { %>
+              <span class="due-badge <%= dueClass %>"><%= new Date(job.due_date).toLocaleDateString('de-DE') %></span>
+              <% } else { %>
+              <span class="text-muted">–</span>
+              <% } %>
             <% } %>
           </td>
           <td class="col-hide-mobile"><%= job.creator_name %></td>
@@ -187,6 +203,21 @@
             <a href="/jobs/<%= job.uuid %>/download" class="btn-icon" title="Download">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             </a>
+            <% if (tab === 'archive') { %>
+            <form method="POST" action="/jobs/<%= job.uuid %>/unarchive" style="display:inline;">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button type="submit" class="btn-icon" title="Aus Archiv zurückholen">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.65"/></svg>
+              </button>
+            </form>
+            <% } else { %>
+            <form method="POST" action="/jobs/<%= job.uuid %>/archive" style="display:inline;">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button type="submit" class="btn-icon" title="Archivieren" onclick="return confirm('Job archivieren?')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+              </button>
+            </form>
+            <% } %>
           </td>
         </tr>
         <% }) %>

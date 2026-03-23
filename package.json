@@ -17,6 +17,7 @@
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.0.0",
+    "chart.js": "^4.4.7",
     "compression": "^1.8.0",
     "connect-sqlite3": "^0.9.15",
     "cookie-parser": "^1.4.7",
@@ -30,7 +31,7 @@
     "node-cron": "^3.0.3",
     "nodemailer": "^6.10.0",
     "pdfkit": "^0.16.0",
-    "chart.js": "^4.4.7",
+    "qrcode": "^1.5.4",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

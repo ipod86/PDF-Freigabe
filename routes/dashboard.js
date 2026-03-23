@@ -9,15 +9,23 @@ router.get('/', requireLogin, (req, res) => {
   const userId = req.session.user.id;
   const filter = req.query.status || 'all';
   const search = req.query.q || '';
+  const tab = req.query.tab || 'active';
 
   let where = '1=1';
   const params = [];
+
+  // Archiv-Tab vs. aktive Jobs
+  if (tab === 'archive') {
+    where += ' AND j.archived = 1';
+  } else {
+    where += ' AND j.archived = 0';
+  }
 
   // Sichtbarkeit: Team-Jobs + eigene private Jobs
   where += ` AND (j.visibility = 'team' OR j.creator_id = ?)`;
   params.push(userId);
 
-  if (filter !== 'all') {
+  if (filter !== 'all' && tab !== 'archive') {
     where += ' AND j.status = ?';
     params.push(filter);
   }
@@ -49,7 +57,7 @@ router.get('/', requireLogin, (req, res) => {
     ORDER BY j.created_at DESC
   `).all(...params);
 
-  // Statistiken
+  // Statistiken (nur nicht-archivierte Jobs)
   const stats = db.prepare(`
     SELECT
       COUNT(*)                                    AS total,
@@ -57,7 +65,7 @@ router.get('/', requireLogin, (req, res) => {
       SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) AS approved,
       SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) AS rejected
     FROM jobs j
-    WHERE (j.visibility = 'team' OR j.creator_id = ?)
+    WHERE (j.visibility = 'team' OR j.creator_id = ?) AND j.archived = 0
   `).get(userId);
 
   res.render('dashboard', {
@@ -66,6 +74,7 @@ router.get('/', requireLogin, (req, res) => {
     stats,
     filter,
     search,
+    tab,
   });
 });
 

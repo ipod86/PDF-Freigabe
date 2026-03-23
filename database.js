@@ -212,6 +212,87 @@ function initialize() {
   safeAlter("ALTER TABLE mail_templates ADD COLUMN deletable INTEGER NOT NULL DEFAULT 1");
   safeAlter("ALTER TABLE mail_templates ADD COLUMN recipient TEXT NOT NULL DEFAULT 'customer'");
 
+  // Neue Feature-Migrationen
+  safeAlter("ALTER TABLE jobs ADD COLUMN archived INTEGER NOT NULL DEFAULT 0");
+  safeAlter("ALTER TABLE jobs ADD COLUMN archived_at DATETIME");
+  safeAlter("ALTER TABLE jobs ADD COLUMN expires_at DATETIME");
+  safeAlter("ALTER TABLE jobs ADD COLUMN signature_required INTEGER NOT NULL DEFAULT 0");
+  safeAlter("ALTER TABLE jobs ADD COLUMN approval_mode TEXT NOT NULL DEFAULT 'any'");
+
+  // Neue Tabellen
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS job_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+      job_name_prefix TEXT,
+      description TEXT,
+      internal_comment TEXT,
+      visibility TEXT NOT NULL DEFAULT 'team',
+      email_customer INTEGER NOT NULL DEFAULT 1,
+      email_creator INTEGER NOT NULL DEFAULT 1,
+      no_reminder INTEGER NOT NULL DEFAULT 0,
+      created_by INTEGER NOT NULL REFERENCES users(id),
+      created_at DATETIME DEFAULT (datetime('now','localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS custom_fields (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      field_key TEXT NOT NULL UNIQUE,
+      field_type TEXT NOT NULL DEFAULT 'text',
+      options TEXT,
+      required INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at DATETIME DEFAULT (datetime('now','localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS job_custom_values (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+      field_id INTEGER NOT NULL REFERENCES custom_fields(id) ON DELETE CASCADE,
+      value TEXT,
+      UNIQUE(job_id, field_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS job_recipients (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+      contact_id INTEGER NOT NULL REFERENCES contacts(id),
+      email TEXT NOT NULL,
+      name TEXT NOT NULL,
+      access_token TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'pending',
+      customer_comment TEXT,
+      status_changed_at DATETIME,
+      notified_at DATETIME,
+      created_at DATETIME DEFAULT (datetime('now','localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS job_signatures (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+      recipient_token TEXT NOT NULL,
+      signer_name TEXT,
+      signature_data TEXT NOT NULL,
+      signed_at DATETIME DEFAULT (datetime('now','localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS customer_users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      name TEXT NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1,
+      last_login DATETIME,
+      password_reset_token TEXT,
+      password_reset_expires DATETIME,
+      created_at DATETIME DEFAULT (datetime('now','localtime'))
+    );
+  `);
+
   // Migration: email_sent → email_customer (alte Daten übernehmen)
   try { db.exec("UPDATE jobs SET email_customer = email_sent WHERE email_customer = 1 AND email_sent = 0"); } catch {}
 
@@ -329,6 +410,25 @@ function initialize() {
       body_text: `Erinnerung: Freigabe ausstehend\n\nAuftrag: {{job_name}}\n{{#if due_date}}Fällig bis: {{due_date}}\n{{/if}}\nLink: {{approval_link}}\n{{#if access_password}}Passwort: {{access_password}}\n{{/if}}\nMit freundlichen Grüßen\n{{company_name}}`
     },
     {
+      slug: 'portal_invite',
+      name: 'Portal-Einladung',
+      event: 'portal_invite',
+      recipient: 'customer',
+      subject: 'Ihr Zugang zum Kunden-Portal: {{company_name}}',
+      description: 'Wird an Kunden gesendet, wenn ein Portal-Zugang angelegt wird.',
+      deletable: 0,
+      body_html: `<h2>Ihr Kunden-Portal-Zugang</h2>
+<p>Guten Tag {{contact_name}},</p>
+<p>wir haben für Sie einen persönlichen Zugang zum Kunden-Portal eingerichtet.</p>
+<p><strong>Ihre Zugangsdaten:</strong></p>
+<p>E-Mail: <strong>{{portal_email}}</strong><br>
+Passwort: <strong>{{portal_password}}</strong></p>
+<p><a href="{{portal_link}}" style="display:inline-block;padding:12px 32px;background:#4361ee;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">Zum Portal</a></p>
+<p>Bitte ändern Sie Ihr Passwort nach der ersten Anmeldung.</p>
+<p>Mit freundlichen Grüßen<br>{{company_name}}</p>`,
+      body_text: `Kunden-Portal-Zugang\n\nGuten Tag {{contact_name}},\n\nIhre Zugangsdaten:\nE-Mail: {{portal_email}}\nPasswort: {{portal_password}}\n\nPortal: {{portal_link}}\n\nMit freundlichen Grüßen\n{{company_name}}`
+    },
+    {
       slug: 'version_uploaded',
       name: 'Neue Version hochgeladen',
       event: 'version_uploaded',
@@ -373,6 +473,11 @@ function initialize() {
   insertSetting.run('company_name', 'Meine Firma GmbH');
   insertSetting.run('reminder_days', '3');
   insertSetting.run('max_reminders', '3');
+  insertSetting.run('reminder_first_days', '3');
+  insertSetting.run('reminder_interval_days', '1');
+  insertSetting.run('reminder_max_count', '3');
+  insertSetting.run('auto_archive_months', '0');
+  insertSetting.run('auto_delete_months', '0');
   insertSetting.run('primary_color', '#4361ee');
   insertSetting.run('accent_color', '#2563eb');
   insertSetting.run('imprint', `<h1>Impressum</h1>

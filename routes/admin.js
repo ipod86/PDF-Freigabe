@@ -442,4 +442,106 @@ router.get('/sysinfo', adminOnly, (req, res) => {
   res.render('admin/sysinfo', { title: 'Systeminformationen', sysinfo });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// JOB-VORLAGEN
+// ═══════════════════════════════════════════════════════════════════════════
+router.get('/job-templates', (req, res) => {
+  const db = getDb();
+  const templates = db.prepare(`
+    SELECT jt.*, c.company AS customer_company, u.name AS creator_name
+    FROM job_templates jt
+    LEFT JOIN customers c ON c.id = jt.customer_id
+    LEFT JOIN users u ON u.id = jt.created_by
+    ORDER BY jt.name
+  `).all();
+  const customers = db.prepare('SELECT id, company FROM customers WHERE active=1 ORDER BY company').all();
+  res.render('admin/job_templates', { title: 'Job-Vorlagen', templates, customers });
+});
+
+router.post('/job-templates', (req, res) => {
+  const db = getDb();
+  const { name, customer_id, job_name_prefix, description, internal_comment, visibility, email_customer, email_creator, no_reminder } = req.body;
+  if (!name) { req.session.flash = { type: 'error', text: 'Name erforderlich.' }; return res.redirect('/admin/job-templates'); }
+  db.prepare(`INSERT INTO job_templates (name, customer_id, job_name_prefix, description, internal_comment, visibility, email_customer, email_creator, no_reminder, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(name, customer_id || null, job_name_prefix || null, description || null, internal_comment || null,
+      visibility || 'team', email_customer === '1' ? 1 : 0, email_creator === '1' ? 1 : 0,
+      no_reminder === '1' ? 1 : 0, req.session.user.id);
+  req.session.flash = { type: 'success', text: `Vorlage "${name}" erstellt.` };
+  res.redirect('/admin/job-templates');
+});
+
+router.post('/job-templates/:id/delete', (req, res) => {
+  getDb().prepare('DELETE FROM job_templates WHERE id=?').run(req.params.id);
+  req.session.flash = { type: 'success', text: 'Vorlage gelöscht.' };
+  res.redirect('/admin/job-templates');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BENUTZERDEFINIERTE FELDER
+// ═══════════════════════════════════════════════════════════════════════════
+router.get('/custom-fields', adminOnly, (req, res) => {
+  const fields = getDb().prepare('SELECT * FROM custom_fields ORDER BY sort_order, id').all();
+  res.render('admin/custom_fields', { title: 'Benutzerdefinierte Felder', fields });
+});
+
+router.post('/custom-fields', adminOnly, (req, res) => {
+  const db = getDb();
+  const { name, field_type, options, required, sort_order } = req.body;
+  if (!name) { req.session.flash = { type: 'error', text: 'Name erforderlich.' }; return res.redirect('/admin/custom-fields'); }
+  // Slug aus Name generieren
+  const field_key = name.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/__+/g, '_').replace(/^_|_$/g, '') + '_' + Date.now();
+  db.prepare(`INSERT INTO custom_fields (name, field_key, field_type, options, required, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(name, field_key, field_type || 'text', options || null, required === '1' ? 1 : 0, parseInt(sort_order) || 0);
+  req.session.flash = { type: 'success', text: `Feld "${name}" angelegt.` };
+  res.redirect('/admin/custom-fields');
+});
+
+router.post('/custom-fields/:id/delete', adminOnly, (req, res) => {
+  getDb().prepare('DELETE FROM custom_fields WHERE id=?').run(req.params.id);
+  req.session.flash = { type: 'success', text: 'Feld gelöscht.' };
+  res.redirect('/admin/custom-fields');
+});
+
+router.post('/custom-fields/:id/toggle', adminOnly, (req, res) => {
+  getDb().prepare('UPDATE custom_fields SET active = CASE WHEN active=1 THEN 0 ELSE 1 END WHERE id=?').run(req.params.id);
+  res.redirect('/admin/custom-fields');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PORTAL-BENUTZER
+// ═══════════════════════════════════════════════════════════════════════════
+router.post('/customers/:id/portal-user', (req, res) => {
+  const db = getDb();
+  const { email, name, password } = req.body;
+  if (!email || !name || !password) {
+    req.session.flash = { type: 'error', text: 'Alle Felder ausfüllen.' };
+    return res.redirect('/admin/customers');
+  }
+  const hash = bcrypt.hashSync(password, 12);
+  try {
+    db.prepare('INSERT INTO customer_users (customer_id, email, password_hash, name) VALUES (?, ?, ?, ?)').run(req.params.id, email, hash, name);
+    req.session.flash = { type: 'success', text: `Portal-Benutzer "${name}" angelegt.` };
+  } catch (e) {
+    req.session.flash = { type: 'error', text: 'Fehler: ' + e.message };
+  }
+  res.redirect('/admin/customers');
+});
+
+router.post('/portal-users/:id/delete', adminOnly, (req, res) => {
+  getDb().prepare('DELETE FROM customer_users WHERE id=?').run(req.params.id);
+  req.session.flash = { type: 'success', text: 'Portal-Benutzer gelöscht.' };
+  res.redirect('/admin/customers');
+});
+
+router.post('/portal-users/:id/reset-password', adminOnly, (req, res) => {
+  const { new_password } = req.body;
+  if (!new_password) { req.session.flash = { type: 'error', text: 'Passwort eingeben.' }; return res.redirect('/admin/customers'); }
+  const hash = bcrypt.hashSync(new_password, 12);
+  getDb().prepare('UPDATE customer_users SET password_hash=? WHERE id=?').run(hash, req.params.id);
+  req.session.flash = { type: 'success', text: 'Passwort zurückgesetzt.' };
+  res.redirect('/admin/customers');
+});
+
 module.exports = router;

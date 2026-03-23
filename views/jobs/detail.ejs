@@ -48,7 +48,7 @@
     <% if (isMultiFile) { %>
     <!-- ═══ ALLE PDFs ANZEIGEN (Multi-File) ═══ -->
     <% files.forEach((f, i) => { %>
-    <div class="pdf-card pdf-card-<%= f.status %>">
+    <div class="pdf-card pdf-card-<%= f.status %>" data-file-id="<%= f.id %>">
       <div class="pdf-card-header">
         <span class="pdf-card-num"><%= i + 1 %></span>
         <strong><%= f.original_name %></strong>
@@ -246,6 +246,47 @@
       </div>
     </div>
 
+    <!-- Custom Fields -->
+    <% if (typeof customFieldValues !== 'undefined' && customFieldValues.length > 0) { %>
+    <div class="sidebar-card">
+      <h4>Zusatzfelder</h4>
+      <dl class="info-list">
+        <% customFieldValues.forEach(cfv => { %>
+        <dt><%= cfv.name %></dt>
+        <dd><%= cfv.value %></dd>
+        <% }) %>
+      </dl>
+    </div>
+    <% } %>
+
+    <!-- Mehrere Empfänger -->
+    <% if (typeof jobRecipients !== 'undefined' && jobRecipients.length > 0) { %>
+    <div class="sidebar-card">
+      <h4>Weitere Empfänger</h4>
+      <div class="file-list">
+        <% jobRecipients.forEach(r => { %>
+        <div class="file-item file-<%= r.status %>">
+          <div class="file-status"><span class="status-dot status-<%= r.status %>"></span></div>
+          <div class="file-info">
+            <strong><%= r.name %></strong>
+            <small class="text-muted"><%= r.email %> · <%= r.status === 'approved' ? 'Freigegeben' : r.status === 'rejected' ? 'Abgelehnt' : 'Offen' %></small>
+          </div>
+        </div>
+        <% }) %>
+      </div>
+    </div>
+    <% } %>
+
+    <!-- Unterschrift-Vorschau -->
+    <% if (typeof jobSignature !== 'undefined' && jobSignature) { %>
+    <div class="sidebar-card">
+      <h4>Digitale Unterschrift</h4>
+      <% if (jobSignature.signer_name) { %><p style="font-size:0.85rem;margin-bottom:8px;"><strong><%= jobSignature.signer_name %></strong></p><% } %>
+      <img src="<%= jobSignature.signature_data %>" alt="Unterschrift" style="max-width:100%;border:1px solid var(--border);border-radius:var(--radius);background:#fff;">
+      <small class="text-muted" style="display:block;margin-top:4px;">Unterzeichnet am <%= new Date(jobSignature.signed_at).toLocaleString('de-DE') %></small>
+    </div>
+    <% } %>
+
     <!-- 6. Aktionen -->
     <div class="sidebar-card">
       <h4>Aktionen</h4>
@@ -258,6 +299,10 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
           Protokoll per Mail
         </button>
+        <button class="btn btn-ghost btn-sm btn-full" onclick="showQrCode('<%= job.access_token %>')" style="margin-bottom:8px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3z"/><path d="M17 17h4v4h-4z"/></svg>
+          QR-Code anzeigen
+        </button>
         <form method="POST" action="/jobs/<%= job.uuid %>/duplicate" style="margin-bottom:8px;">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <button type="submit" class="btn btn-ghost btn-sm btn-full">
@@ -269,6 +314,23 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
           Mail erneut
         </button>
+        <% if (!job.archived) { %>
+        <form method="POST" action="/jobs/<%= job.uuid %>/archive" style="margin-bottom:8px;" onsubmit="return confirm('Job archivieren?')">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button type="submit" class="btn btn-ghost btn-sm btn-full">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+            Archivieren
+          </button>
+        </form>
+        <% } else { %>
+        <form method="POST" action="/jobs/<%= job.uuid %>/unarchive" style="margin-bottom:8px;">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button type="submit" class="btn btn-ghost btn-sm btn-full">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.65"/></svg>
+            Aus Archiv zurückholen
+          </button>
+        </form>
+        <% } %>
         <button class="btn btn-ghost btn-sm btn-full" onclick="window.print()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
           Drucken
@@ -343,6 +405,24 @@ async function resendMail(jobId) {
   else { alert('Fehler: ' + (data.error || 'Unbekannt')); }
 }
 
+async function showQrCode(token) {
+  try {
+    const res = await csrfFetch('/api/qr/' + token);
+    if (!res.ok) { alert('QR-Code nicht verfügbar (qrcode-Paket nicht installiert)'); return; }
+    const data = await res.json();
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    modal.innerHTML = `<div style="background:#fff;border-radius:12px;padding:28px;text-align:center;max-width:300px;width:90%;">
+      <h3 style="margin:0 0 16px;font-size:1rem;">Freigabe QR-Code</h3>
+      <img src="${data.qrCode}" style="width:200px;height:200px;" alt="QR Code">
+      <p style="font-size:0.75rem;color:#6b7280;margin:12px 0 16px;word-break:break-all;">${data.url}</p>
+      <button onclick="this.closest('div').parentElement.remove()" style="padding:8px 20px;background:#4361ee;color:#fff;border:none;border-radius:6px;cursor:pointer;">Schließen</button>
+    </div>`;
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    document.body.appendChild(modal);
+  } catch(e) { alert('Fehler beim Laden des QR-Codes'); }
+}
+
 async function sendProtocol() {
   if (!confirm('Freigabeprotokoll als PDF an Sachbearbeiter und Kunde senden?')) return;
   try {
@@ -353,6 +433,83 @@ async function sendProtocol() {
   } catch (e) { alert('Verbindungsfehler'); }
 }
 </script>
+
+<script>
+// Drag & Drop Dateireihenfolge
+(function() {
+  const cards = document.querySelectorAll('.pdf-card');
+  if (cards.length < 2) return;
+
+  let dragSrc = null;
+
+  // Drag handles zu den pdf-cards hinzufügen
+  cards.forEach(card => {
+    card.setAttribute('draggable', 'true');
+    const header = card.querySelector('.pdf-card-header');
+    if (header) {
+      const handle = document.createElement('span');
+      handle.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="18" x2="16" y2="18"/></svg>';
+      handle.style.cssText = 'cursor:grab;opacity:0.4;margin-right:4px;flex-shrink:0;';
+      handle.title = 'Ziehen zum Sortieren';
+      header.insertBefore(handle, header.firstChild);
+    }
+
+    card.addEventListener('dragstart', function(e) {
+      dragSrc = this;
+      this.style.opacity = '0.4';
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    card.addEventListener('dragend', function() {
+      this.style.opacity = '';
+      document.querySelectorAll('.pdf-card').forEach(c => c.classList.remove('drag-over-card'));
+    });
+    card.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (this !== dragSrc) this.classList.add('drag-over-card');
+    });
+    card.addEventListener('dragleave', function() { this.classList.remove('drag-over-card'); });
+    card.addEventListener('drop', async function(e) {
+      e.preventDefault();
+      this.classList.remove('drag-over-card');
+      if (dragSrc === this) return;
+      const parent = this.parentNode;
+      const allCards = [...parent.querySelectorAll('.pdf-card')];
+      const srcIdx = allCards.indexOf(dragSrc);
+      const dstIdx = allCards.indexOf(this);
+      if (srcIdx < dstIdx) parent.insertBefore(dragSrc, this.nextSibling);
+      else parent.insertBefore(dragSrc, this);
+
+      // Neue Reihenfolge an Server senden
+      const order = [...parent.querySelectorAll('.pdf-card')].map(c => {
+        const dl = c.querySelector('[data-file-id]');
+        return dl ? dl.dataset.fileId : null;
+      }).filter(Boolean);
+
+      if (order.length > 0) {
+        try {
+          await csrfFetch('/api/jobs/<%= job.uuid %>/files/reorder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order }),
+          });
+        } catch {}
+      }
+    });
+  });
+
+  // file-id data-Attribute zu pdf-cards hinzufügen (über Index der files Array)
+  const fileIds = [<% if (files && files.length > 0) { files.forEach((f,i) => { %><%= f.id %><% if(i<files.length-1){%>,<%}}) } %>];
+  cards.forEach((card, i) => {
+    if (fileIds[i]) card.setAttribute('data-file-id', fileIds[i]);
+    // Auch ein unsichtbares Anchor-Element für drop-Erkennung
+    card.querySelector('.pdf-card-header')?.setAttribute('data-file-id', fileIds[i] || '');
+  });
+})();
+</script>
+<style>
+.drag-over-card { border: 2px dashed var(--accent) !important; }
+</style>
 
 <!-- Share-Modal Template (wird per JS in body verschoben) -->
 <div id="shareModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">

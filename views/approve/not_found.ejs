@@ -3,15 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nicht gefunden</title>
+  <title><%= typeof title !== 'undefined' ? title : 'Nicht gefunden' %></title>
   <link rel="stylesheet" href="/css/fonts.css?v=<%= typeof v !== 'undefined' ? v : '1' %>">
   <link rel="stylesheet" href="/css/style.css?v=<%= typeof v !== 'undefined' ? v : '1' %>">
 </head>
 <body class="approve-body">
   <main class="approve-main" style="text-align:center;padding:4rem 2rem;">
+    <% if (typeof reason !== 'undefined' && reason === 'expired') { %>
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    <h1 style="margin-top:1.5rem;color:var(--text);">Link abgelaufen</h1>
+    <p style="color:var(--text-muted);max-width:400px;margin:1rem auto;">Dieser Freigabe-Link ist abgelaufen und kann nicht mehr verwendet werden. Bitte wenden Sie sich an Ihren Ansprechpartner für einen neuen Link.</p>
+    <% } else { %>
     <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
     <h1 style="margin-top:1.5rem;color:var(--text);">Link nicht gefunden</h1>
     <p style="color:var(--text-muted);max-width:400px;margin:1rem auto;">Dieser Freigabe-Link ist ungültig oder wurde bereits verwendet. Bitte wenden Sie sich an Ihren Ansprechpartner.</p>
+    <% } %>
   </main>
 </body>
 </html>

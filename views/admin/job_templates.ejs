@@ -1,0 +1,109 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Job-Vorlagen</h1>
+    <p class="page-subtitle">Wiederverwendbare Vorlagen für neue Freigaben</p>
+  </div>
+</div>
+
+<div class="card mb-lg">
+  <h3>Neue Vorlage anlegen</h3>
+  <form method="POST" action="/admin/job-templates">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="form-row">
+      <div class="form-group flex-2">
+        <label>Name der Vorlage <span class="required">*</span></label>
+        <input type="text" name="name" required placeholder="z.B. Standard-Visitenkarten">
+      </div>
+      <div class="form-group flex-2">
+        <label>Auftrags-Präfix</label>
+        <input type="text" name="job_name_prefix" placeholder="z.B. Visitenkarten">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group flex-2">
+        <label>Standard-Kunde</label>
+        <select name="customer_id">
+          <option value="">– kein –</option>
+          <% customers.forEach(c => { %>
+          <option value="<%= c.id %>"><%= c.company %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="form-group flex-2">
+        <label>Sichtbarkeit</label>
+        <select name="visibility">
+          <option value="team">Team</option>
+          <option value="private">Privat</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group flex-2">
+        <label>Besonderheiten</label>
+        <textarea name="description" rows="2" placeholder="Wird als Standard-Besonderheiten eingefügt"></textarea>
+      </div>
+      <div class="form-group flex-2">
+        <label>Interner Kommentar</label>
+        <textarea name="internal_comment" rows="2" placeholder="Standard-interner Kommentar"></textarea>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="checkbox-label"><input type="checkbox" name="email_customer" value="1" checked> E-Mail an Kunden</label>
+      </div>
+      <div class="form-group">
+        <label class="checkbox-label"><input type="checkbox" name="email_creator" value="1" checked> E-Mail an Sachbearbeiter</label>
+      </div>
+      <div class="form-group">
+        <label class="checkbox-label"><input type="checkbox" name="no_reminder" value="1"> Keine Erinnerungen</label>
+      </div>
+      <div class="form-group form-action">
+        <button type="submit" class="btn btn-primary">Anlegen</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="table-wrap">
+  <% if (templates.length === 0) { %>
+  <div class="empty-state">
+    <p>Noch keine Vorlagen angelegt.</p>
+  </div>
+  <% } else { %>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Präfix</th>
+        <th>Standard-Kunde</th>
+        <th>Ersteller</th>
+        <th>Erstellt</th>
+        <th>Aktionen</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% templates.forEach(t => { %>
+      <tr>
+        <td><strong><%= t.name %></strong></td>
+        <td class="text-muted"><%= t.job_name_prefix || '–' %></td>
+        <td><%= t.customer_company || '–' %></td>
+        <td><%= t.creator_name %></td>
+        <td class="text-muted"><%= new Date(t.created_at).toLocaleDateString('de-DE') %></td>
+        <td class="col-actions">
+          <form method="POST" action="/admin/job-templates/<%= t.id %>/delete" style="display:inline" onsubmit="return confirm('Vorlage löschen?')">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn-icon btn-icon-danger" title="Löschen">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </form>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

@@ -136,6 +136,27 @@
       <% } %>
 
       <% if (!isMultiFile) { %>
+      <!-- Digitale Unterschrift (falls erforderlich) -->
+      <% if (job.signature_required && !existingSignature) { %>
+      <div class="approve-section" id="signatureSection">
+        <h3 style="font-size:1rem;margin-bottom:8px;">Digitale Unterschrift</h3>
+        <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:12px;">Bitte unterschreiben Sie, bevor Sie die Freigabe erteilen können.</p>
+        <div style="border:2px solid var(--border);border-radius:var(--radius);background:#fff;position:relative;">
+          <canvas id="signatureCanvas" width="600" height="200" style="width:100%;touch-action:none;display:block;border-radius:var(--radius);"></canvas>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <input type="text" id="signerName" placeholder="Ihr Name (optional)" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:var(--radius);font-size:0.85rem;">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="clearSignature()">Löschen</button>
+          <button type="button" class="btn btn-approve btn-sm" onclick="saveSignature()" id="btnSaveSignature">Unterschrift speichern</button>
+        </div>
+        <div id="signatureSaved" style="display:none;color:#059669;font-size:0.88rem;margin-top:8px;font-weight:600;">✓ Unterschrift gespeichert – Sie können nun die Freigabe erteilen.</div>
+      </div>
+      <% } else if (job.signature_required && existingSignature) { %>
+      <div class="approve-section" style="border:1px solid #d1fae5;background:#ecfdf5;border-radius:var(--radius);padding:12px;margin-bottom:16px;">
+        <p style="color:#059669;font-size:0.88rem;font-weight:600;margin:0;">✓ Unterschrift vorhanden – <%= existingSignature.signer_name ? existingSignature.signer_name + ', ' : '' %>Sie können die Freigabe erteilen.</p>
+      </div>
+      <% } %>
+
       <!-- Freigabe-Aktionen (nur bei einzelnem PDF) -->
       <div class="approve-actions" id="approveActions">
         <div class="form-group">
@@ -143,7 +164,7 @@
           <textarea id="comment" rows="3" placeholder="Anmerkungen zur Freigabe oder Ablehnung..."></textarea>
         </div>
         <div class="approve-buttons">
-          <button class="btn btn-approve" id="btnApprove" onclick="submitApproval('approve')">
+          <button class="btn btn-approve" id="btnApprove" onclick="submitApproval('approve')" <% if (job.signature_required && !existingSignature) { %>disabled style="opacity:0.5"<% } %>>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
             Druckfreigabe erteilen
           </button>
@@ -181,6 +202,82 @@
   </footer>
 
   <script>
+  // ─── Signature Pad (inline minimal implementation) ──────────────────────
+  (function() {
+    const canvas = document.getElementById('signatureCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+    let signatureSaved = false;
+
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      if (e.touches) {
+        return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
+      }
+      return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+    }
+
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    function start(e) { e.preventDefault(); drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }
+    function move(e) { if (!drawing) return; e.preventDefault(); const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); }
+    function end(e) { drawing = false; }
+
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    canvas.addEventListener('mouseup', end);
+    canvas.addEventListener('touchstart', start, { passive: false });
+    canvas.addEventListener('touchmove', move, { passive: false });
+    canvas.addEventListener('touchend', end);
+
+    window.clearSignature = function() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      signatureSaved = false;
+      document.getElementById('signatureSaved').style.display = 'none';
+      const btn = document.getElementById('btnApprove');
+      if (btn) btn.disabled = true;
+    };
+
+    window.isSignatureEmpty = function() {
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      return !data.some(d => d !== 0);
+    };
+
+    window.saveSignature = async function() {
+      if (window.isSignatureEmpty()) { alert('Bitte unterschreiben Sie zuerst.'); return; }
+      const sigData = canvas.toDataURL('image/png');
+      const signerName = document.getElementById('signerName').value;
+      const btn = document.getElementById('btnSaveSignature');
+      btn.disabled = true;
+      try {
+        const res = await fetch(window.location.pathname + '/sign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ signature_data: sigData, signer_name: signerName }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('signatureSaved').style.display = 'block';
+          const approveBtn = document.getElementById('btnApprove');
+          if (approveBtn) { approveBtn.disabled = false; approveBtn.style.opacity = ''; }
+          signatureSaved = true;
+        } else {
+          alert(data.error || 'Fehler beim Speichern der Unterschrift');
+          btn.disabled = false;
+        }
+      } catch(e) {
+        alert('Verbindungsfehler');
+        btn.disabled = false;
+      }
+    };
+  })();
+
   async function submitApproval(action) {
     const comment = document.getElementById('comment').value;
     const label = action === 'approve' ? 'Freigabe' : 'Ablehnung';

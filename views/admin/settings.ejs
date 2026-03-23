@@ -131,14 +131,44 @@
     <h3>Automatische Erinnerungen</h3>
     <div class="settings-row">
       <div class="form-group">
-        <label for="reminder_days">Erinnerung nach (Tagen)</label>
-        <input type="number" id="reminder_days" name="reminder_days" value="<%= settings.reminder_days || 3 %>" min="1" max="30">
+        <label for="reminder_first_days">Erste Erinnerung nach (Tagen)</label>
+        <input type="number" id="reminder_first_days" name="reminder_first_days" value="<%= settings.reminder_first_days || 3 %>" min="1" max="30">
+        <small class="form-hint">Erste Erinnerung X Tage nach Erstellung.</small>
       </div>
       <div class="form-group">
-        <label for="max_reminders">Maximale Erinnerungen</label>
-        <input type="number" id="max_reminders" name="max_reminders" value="<%= settings.max_reminders || 3 %>" min="1" max="10">
+        <label for="reminder_interval_days">Dann alle X Tage</label>
+        <input type="number" id="reminder_interval_days" name="reminder_interval_days" value="<%= settings.reminder_interval_days || 1 %>" min="1" max="30">
+        <small class="form-hint">Folge-Erinnerungen in diesem Intervall.</small>
+      </div>
+      <div class="form-group">
+        <label for="reminder_max_count">Maximale Erinnerungen</label>
+        <input type="number" id="reminder_max_count" name="reminder_max_count" value="<%= settings.reminder_max_count || 3 %>" min="1" max="10">
       </div>
     </div>
+  </div>
+
+  <!-- Datenschutz & Aufbewahrung -->
+  <div class="card mb-lg">
+    <h3>Datenschutz &amp; Aufbewahrung</h3>
+    <p class="text-muted" style="font-size:0.85rem;margin-bottom:12px;">Automatische Bereinigung älterer Jobs. Setzt 0 um die Funktion zu deaktivieren.</p>
+    <div class="settings-row">
+      <div class="form-group">
+        <label for="auto_archive_months">Jobs nach X Monaten archivieren</label>
+        <input type="number" id="auto_archive_months" name="auto_archive_months" value="<%= settings.auto_archive_months || 0 %>" min="0" max="120">
+        <small class="form-hint">0 = deaktiviert. Nur abgeschlossene Jobs (freigegeben/abgelehnt).</small>
+      </div>
+      <div class="form-group">
+        <label for="auto_delete_months">Archivierte Jobs nach X Monaten löschen</label>
+        <input type="number" id="auto_delete_months" name="auto_delete_months" value="<%= settings.auto_delete_months || 0 %>" min="0" max="120">
+        <small class="form-hint">0 = deaktiviert.</small>
+      </div>
+    </div>
+    <% if (parseInt(settings.auto_delete_months || 0) > 0) { %>
+    <div class="form-info-box" style="border-color:var(--red);background:rgba(239,68,68,0.05);">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span style="color:var(--red);font-weight:600;">Achtung: Gelöschte Jobs und PDFs können nicht wiederhergestellt werden.</span>
+    </div>
+    <% } %>
   </div>
 
   <!-- Datenschutzerklärung -->
