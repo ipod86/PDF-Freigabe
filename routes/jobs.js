@@ -48,15 +48,11 @@ router.get('/create', requireLogin, (req, res) => {
     });
   });
 
-  // Custom Fields laden
-  let customFields = [];
-  try { customFields = db.prepare('SELECT * FROM custom_fields WHERE active=1 ORDER BY sort_order').all(); } catch {}
-
   // Job-Vorlagen laden
   let jobTemplates = [];
   try { jobTemplates = db.prepare(`SELECT jt.*, c.company AS customer_company FROM job_templates jt LEFT JOIN customers c ON c.id=jt.customer_id ORDER BY jt.name`).all(); } catch {}
 
-  res.render('jobs/create', { title: 'Freigabe erstellen', customers, customFields, jobTemplates });
+  res.render('jobs/create', { title: 'Freigabe erstellen', customers, jobTemplates });
 });
 
 // ─── Freigabe speichern ─────────────────────────────────────────────────────
@@ -152,18 +148,6 @@ router.post('/create', requireLogin, (req, res, next) => {
   files.forEach((file, i) => {
     insertFile.run(jobId, file.originalname, file.filename, file.size, i + 1);
   });
-
-  // Custom Field Values speichern
-  try {
-    const cfInsert = db.prepare('INSERT OR REPLACE INTO job_custom_values (job_id, field_id, value) VALUES (?, ?, ?)');
-    const allCf = db.prepare('SELECT * FROM custom_fields WHERE active=1').all();
-    for (const cf of allCf) {
-      const val = req.body['cf_' + cf.field_key];
-      if (val !== undefined && val !== '') {
-        cfInsert.run(jobId, cf.id, val);
-      }
-    }
-  } catch {}
 
   // Audit-Log
   db.prepare(`
@@ -307,18 +291,6 @@ router.get('/:uuid', requireLogin, (req, res) => {
     });
   } catch {}
 
-  // Custom Field Values laden
-  let customFieldValues = [];
-  try {
-    customFieldValues = db.prepare(`
-      SELECT cf.name, cf.field_type, jcv.value
-      FROM job_custom_values jcv
-      JOIN custom_fields cf ON cf.id = jcv.field_id
-      WHERE jcv.job_id = ? AND jcv.value IS NOT NULL AND jcv.value != ''
-      ORDER BY cf.sort_order
-    `).all(job.id);
-  } catch {}
-
   // Unterschrift laden (falls vorhanden)
   let jobSignature = null;
   try { jobSignature = db.prepare('SELECT * FROM job_signatures WHERE job_id = ? ORDER BY signed_at DESC LIMIT 1').get(job.id); } catch {}
@@ -331,7 +303,7 @@ router.get('/:uuid', requireLogin, (req, res) => {
   let baseUrl = '';
   try { baseUrl = db.prepare("SELECT value FROM settings WHERE key='base_url'").get()?.value || ''; } catch {}
 
-  res.render('jobs/detail', { title: job.job_name, job, versions, logs, files, allFiles, customFieldValues, jobSignature, jobRecipients, baseUrl });
+  res.render('jobs/detail', { title: job.job_name, job, versions, logs, files, allFiles, jobSignature, jobRecipients, baseUrl });
 });
 
 // ─── Neue Version: Formularseite ────────────────────────────────────────────

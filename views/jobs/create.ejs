@@ -204,28 +204,6 @@
         </label>
       </div>
 
-      <% if (typeof customFields !== 'undefined' && customFields.length > 0) { %>
-      <div class="form-group">
-        <label>Zusatzfelder</label>
-        <% customFields.forEach(cf => { %>
-        <div style="margin-bottom:8px;">
-          <label style="font-size:0.85rem;font-weight:500;display:block;margin-bottom:2px;"><%= cf.name %><% if(cf.required){%> <span class="required">*</span><%}%></label>
-          <% if (cf.field_type === 'text' || cf.field_type === 'number' || cf.field_type === 'date') { %>
-          <input type="<%= cf.field_type %>" name="cf_<%= cf.field_key %>" <%= cf.required ? 'required' : '' %>>
-          <% } else if (cf.field_type === 'checkbox') { %>
-          <input type="checkbox" name="cf_<%= cf.field_key %>" value="1">
-          <% } else if (cf.field_type === 'select' && cf.options) { %>
-          <select name="cf_<%= cf.field_key %>" <%= cf.required ? 'required' : '' %>>
-            <option value="">– Bitte wählen –</option>
-            <% cf.options.split('\n').forEach(opt => { %>
-            <option value="<%= opt.trim() %>"><%= opt.trim() %></option>
-            <% }) %>
-          </select>
-          <% } %>
-        </div>
-        <% }) %>
-      </div>
-      <% } %>
     </div>
 
     <!-- Rechte Spalte -->

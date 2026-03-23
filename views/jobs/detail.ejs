@@ -246,19 +246,6 @@
       </div>
     </div>
 
-    <!-- Custom Fields -->
-    <% if (typeof customFieldValues !== 'undefined' && customFieldValues.length > 0) { %>
-    <div class="sidebar-card">
-      <h4>Zusatzfelder</h4>
-      <dl class="info-list">
-        <% customFieldValues.forEach(cfv => { %>
-        <dt><%= cfv.name %></dt>
-        <dd><%= cfv.value %></dd>
-        <% }) %>
-      </dl>
-    </div>
-    <% } %>
-
     <!-- Mehrere Empfänger -->
     <% if (typeof jobRecipients !== 'undefined' && jobRecipients.length > 0) { %>
     <div class="sidebar-card">

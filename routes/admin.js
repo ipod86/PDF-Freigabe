@@ -478,38 +478,6 @@ router.post('/job-templates/:id/delete', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// BENUTZERDEFINIERTE FELDER
-// ═══════════════════════════════════════════════════════════════════════════
-router.get('/custom-fields', adminOnly, (req, res) => {
-  const fields = getDb().prepare('SELECT * FROM custom_fields ORDER BY sort_order, id').all();
-  res.render('admin/custom_fields', { title: 'Benutzerdefinierte Felder', fields });
-});
-
-router.post('/custom-fields', adminOnly, (req, res) => {
-  const db = getDb();
-  const { name, field_type, options, required, sort_order } = req.body;
-  if (!name) { req.session.flash = { type: 'error', text: 'Name erforderlich.' }; return res.redirect('/admin/custom-fields'); }
-  // Slug aus Name generieren
-  const field_key = name.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/__+/g, '_').replace(/^_|_$/g, '') + '_' + Date.now();
-  db.prepare(`INSERT INTO custom_fields (name, field_key, field_type, options, required, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(name, field_key, field_type || 'text', options || null, required === '1' ? 1 : 0, parseInt(sort_order) || 0);
-  req.session.flash = { type: 'success', text: `Feld "${name}" angelegt.` };
-  res.redirect('/admin/custom-fields');
-});
-
-router.post('/custom-fields/:id/delete', adminOnly, (req, res) => {
-  getDb().prepare('DELETE FROM custom_fields WHERE id=?').run(req.params.id);
-  req.session.flash = { type: 'success', text: 'Feld gelöscht.' };
-  res.redirect('/admin/custom-fields');
-});
-
-router.post('/custom-fields/:id/toggle', adminOnly, (req, res) => {
-  getDb().prepare('UPDATE custom_fields SET active = CASE WHEN active=1 THEN 0 ELSE 1 END WHERE id=?').run(req.params.id);
-  res.redirect('/admin/custom-fields');
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
 // PORTAL-BENUTZER
 // ═══════════════════════════════════════════════════════════════════════════
 router.post('/customers/:id/portal-user', (req, res) => {
