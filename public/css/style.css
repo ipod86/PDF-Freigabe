@@ -1486,14 +1486,18 @@ main.has-sidebar { max-width: 100vw; box-sizing: border-box; }
 /* Tabellen: Container scrollbar, Tabelle bleibt intakt */
 .table-wrap { max-width: 100%; }
 
-@media (max-width: 768px) {
-
-  /* ─── CRITICAL: Prevent iOS/Android zoom on input focus (causes white screen) ── */
+/* ─── CRITICAL: Prevent iOS/Android zoom on input focus (causes white screen) ──
+   Gilt für alle Touch-Geräte unabhängig von der Bildschirmbreite.
+   iOS zoomt bei jedem Input mit font-size < 16px – auch im Querformat (>768px). ── */
+@media (hover: none) and (pointer: coarse) {
   input[type="text"], input[type="email"], input[type="password"],
   input[type="number"], input[type="date"], input[type="url"],
   input[type="tel"], input[type="search"], select, textarea {
     font-size: 16px !important;
   }
+}
+
+@media (max-width: 768px) {
 
   /* ─── Main Container ─────────────────────────────────────────────────── */
   main.has-sidebar { max-width: 100vw; width: 100%; }
