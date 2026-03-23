@@ -134,8 +134,11 @@ router.post('/users/invite/:id/delete', adminOnly, (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 router.get('/customers', (req, res) => {
   res.render('admin/customers', { title: 'Kundenstamm', customers: getDb().prepare(`
-    SELECT c.*, (SELECT COUNT(*) FROM contacts WHERE customer_id=c.id AND active=1) AS contact_count,
-    (SELECT COUNT(*) FROM jobs WHERE customer_id=c.id) AS job_count FROM customers c ORDER BY c.company`).all() });
+    SELECT c.*,
+      (SELECT COUNT(*) FROM contacts WHERE customer_id=c.id AND active=1) AS contact_count,
+      (SELECT COUNT(*) FROM jobs WHERE customer_id=c.id) AS job_count,
+      (SELECT COUNT(*) FROM customer_users WHERE customer_id=c.id AND active=1) AS portal_count
+    FROM customers c ORDER BY c.company`).all() });
 });
 
 router.post('/customers', (req, res) => {
