@@ -6,7 +6,7 @@ const { execSync } = require('child_process');
 const path = require('path');
 const fs   = require('fs');
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
+const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'));
 const THUMB_DIR  = path.join(UPLOAD_DIR, 'thumbs');
 
 function ensureThumbDir() {
