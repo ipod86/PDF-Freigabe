@@ -5,6 +5,7 @@ const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
 const { getDb } = require('./database');
+const { getOrCreateThumb } = require('./utils/thumb');
 
 function getSetting(key, fallback) {
   try {
@@ -146,15 +147,25 @@ function generateProtocol(jobId, outputStream) {
     doc.moveDown(0.4);
 
     files.forEach((f, i) => {
+      if (doc.y > 700) { doc.addPage(); }
       const fStatus = statusMap[f.status] || f.status;
       const fColor = f.status === 'approved' ? greenColor : f.status === 'rejected' ? redColor : orangeColor;
       const y = doc.y;
-      doc.fontSize(9).font('Helvetica').fillColor('#1a1d26').text(`${i + 1}. ${f.original_name}`, 50, y, { width: 300 });
-      doc.fontSize(9).font('Helvetica-Bold').fillColor(fColor).text(fStatus, 360, y, { width: 100 });
-      if (f.customer_comment) {
-        doc.fontSize(8).font('Helvetica').fillColor(grayColor).text(`  "${f.customer_comment}"`, 50);
+      const thumbH = 52;
+
+      // Thumbnail einbetten
+      const thumbPath = getOrCreateThumb(f.stored_name);
+      if (thumbPath) {
+        try { doc.image(thumbPath, 50, y, { width: 40, height: thumbH }); } catch {}
       }
-      doc.y += 4;
+
+      // Dateiname + Status
+      doc.fontSize(9).font('Helvetica').fillColor('#1a1d26').text(`${i + 1}. ${f.original_name}`, 100, y + 2, { width: 250 });
+      doc.fontSize(9).font('Helvetica-Bold').fillColor(fColor).text(fStatus, 360, y + 2, { width: 100 });
+      if (f.customer_comment) {
+        doc.fontSize(8).font('Helvetica').fillColor(grayColor).text(`"${f.customer_comment}"`, 100, y + 14, { width: 250 });
+      }
+      doc.y = y + thumbH + 6;
     });
   }
 
@@ -215,14 +226,21 @@ function generateProtocol(jobId, outputStream) {
     doc.y = thY + 20;
 
     versions.forEach(v => {
-      if (doc.y > 730) { doc.addPage(); }
+      if (doc.y > 700) { doc.addPage(); }
       const y = doc.y;
+      const vThumbH = 40;
+
+      const vThumb = getOrCreateThumb(v.stored_name);
+      if (vThumb) {
+        try { doc.image(vThumb, 120, y, { width: 30, height: vThumbH }); } catch {}
+      }
+
       doc.fontSize(8).font('Helvetica').fillColor('#1a1d26');
-      doc.text(`V${v.version_number}`, 55, y, { width: 60 });
-      doc.text(v.original_name, 120, y, { width: 200 });
-      doc.text(v.uploaded_by_name, 325, y, { width: 120 });
-      doc.text(v.created_at ? new Date(v.created_at).toLocaleString('de-DE') : '–', 450, y, { width: 100 });
-      doc.y = y + 14;
+      doc.text(`V${v.version_number}`, 55, y + 14, { width: 60 });
+      doc.text(v.original_name, 155, y + 2, { width: 165 });
+      doc.text(v.uploaded_by_name, 325, y + 14, { width: 120 });
+      doc.text(v.created_at ? new Date(v.created_at).toLocaleString('de-DE') : '–', 450, y + 14, { width: 100 });
+      doc.y = y + vThumbH + 6;
     });
   }
 
