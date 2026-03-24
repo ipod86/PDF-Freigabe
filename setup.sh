@@ -344,10 +344,10 @@ if ! $UPDATE_MODE; then
   fi
 
   if [ ! -f "$APP_DIR/data/database.sqlite" ]; then
-    info "Datenbank mit Testdaten anlegen..."
+    info "Datenbank initialisieren..."
     cd "$APP_DIR"
-    su -s /bin/sh "$APP_USER" -c "node seed.js" 2>&1 | tail -5
-    ok "Testdaten angelegt"
+    su -s /bin/sh "$APP_USER" -c "node seed.js" 2>&1 | tail -20
+    ok "Initialdaten angelegt"
   fi
 fi
 
@@ -480,22 +480,31 @@ if $UPDATE_MODE; then
   echo "  ║  DB-Migrationen wurden automatisch ausgeführt.            ║"
   echo "  ╚═══════════════════════════════════════════════════════════╝"
 else
+  INIT_EMAIL=""
+  INIT_PASS=""
+  if [ -f /tmp/pf-init-creds ]; then
+    INIT_EMAIL=$(sed -n '1p' /tmp/pf-init-creds)
+    INIT_PASS=$(sed -n '2p' /tmp/pf-init-creds)
+    rm -f /tmp/pf-init-creds
+  fi
   echo "  ╔═══════════════════════════════════════════════════════════╗"
   echo "  ║  ✅ Installation abgeschlossen!                          ║"
   echo "  ╠═══════════════════════════════════════════════════════════╣"
   echo "  ║  URL:       http://${IP}:3000                             "
-  echo "  ║  Login:     max@firma.de / test1234                       ║"
-  echo "  ║  Benutzer:  $APP_USER (kein Shell-Zugang)                 "
+  if [ -n "$INIT_EMAIL" ]; then
+  echo "  ║  Login:     ${INIT_EMAIL}                    "
+  echo "  ║  Passwort:  ${INIT_PASS}                                  "
+  fi
   echo "  ║                                                           ║"
   echo "  ║  systemctl status pdf-freigabe     Status                 ║"
-  echo "  ║  systemctl restart pdf-freigabe    Neustart                ║"
-  echo "  ║  journalctl -u pdf-freigabe -f     Live-Logs               ║"
+  echo "  ║  systemctl restart pdf-freigabe    Neustart               ║"
+  echo "  ║  journalctl -u pdf-freigabe -f     Live-Logs              ║"
   echo "  ║                                                           ║"
-  echo "  ║  HTTPS: apt install caddy                                  ║"
-  echo "  ║  In /etc/caddy/Caddyfile:                                  ║"
-  echo "  ║    freigabe.meinefirma.de {                                ║"
-  echo "  ║      reverse_proxy localhost:3000                          ║"
-  echo "  ║    }                                                       ║"
+  echo "  ║  HTTPS: apt install caddy                                 ║"
+  echo "  ║  In /etc/caddy/Caddyfile:                                 ║"
+  echo "  ║    freigabe.meinefirma.de {                               ║"
+  echo "  ║      reverse_proxy localhost:3000                         ║"
+  echo "  ║    }                                                      ║"
   echo "  ╚═══════════════════════════════════════════════════════════╝"
 fi
 echo ""
