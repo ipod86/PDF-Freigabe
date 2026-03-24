@@ -2,7 +2,9 @@
   <script src="/js/app.js?v=<%= typeof v !== 'undefined' ? v : '1' %>"></script>
   <script>
   (function() {
-    var isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    var isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+      || ('ontouchstart' in window)
+      || window.matchMedia('(max-width: 900px)').matches;
     if (!isMobile) return;
     document.querySelectorAll('iframe.pdf-frame').forEach(function(iframe) {
       var src = iframe.src;
