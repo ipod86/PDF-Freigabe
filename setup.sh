@@ -36,51 +36,70 @@ BACKUP_DIR="/tmp/pdf-freigabe-update-backup-$(date +%s)"
 # ═══════════════════════════════════════════════════════════════════════════
 # INSTALLATION IN /opt (Service-User braucht Zugriff)
 # ═══════════════════════════════════════════════════════════════════════════
+GIT_REPO="git@github.com:ipod86/PDF-Freigabe.git"
+
 if [ "$APP_DIR" != "$INSTALL_DIR" ]; then
-  info "App wird nach $INSTALL_DIR kopiert..."
-  info "(Service-User '$APP_USER' braucht Zugriff — /root ist nicht geeignet)"
+  # ─── Weg 1: /opt ist bereits ein git-Repo → git pull ─────────────────────
+  if [ -d "$INSTALL_DIR/.git" ]; then
+    info "Git-Repo in $INSTALL_DIR gefunden → git pull..."
+    git -C "$INSTALL_DIR" pull
+    ok "Code aktualisiert via git pull"
+    APP_DIR="$INSTALL_DIR"
+    echo ""
 
-  # Falls /opt/pdf-freigabe schon existiert: Daten sichern
-  if [ -d "$INSTALL_DIR/data" ]; then
-    mkdir -p "$BACKUP_DIR"
-    cp -r "$INSTALL_DIR/data" "$BACKUP_DIR/data" 2>/dev/null || true
-    cp -r "$INSTALL_DIR/uploads" "$BACKUP_DIR/uploads" 2>/dev/null || true
-    cp "$INSTALL_DIR/.env" "$BACKUP_DIR/.env" 2>/dev/null || true
-    cp -r "$INSTALL_DIR/backups" "$BACKUP_DIR/backups" 2>/dev/null || true
-    if [ -d "$INSTALL_DIR/public/uploads/logo" ]; then
-      mkdir -p "$BACKUP_DIR/logo"
-      cp -r "$INSTALL_DIR/public/uploads/logo/." "$BACKUP_DIR/logo/" 2>/dev/null || true
+  # ─── Weg 2: /opt existiert noch nicht → git clone ────────────────────────
+  elif [ ! -d "$INSTALL_DIR" ]; then
+    info "Klone $GIT_REPO nach $INSTALL_DIR..."
+    git clone "$GIT_REPO" "$INSTALL_DIR"
+    ok "Repository geklont"
+    APP_DIR="$INSTALL_DIR"
+    echo ""
+
+  # ─── Weg 3: /opt existiert aber kein git → cp (Fallback, wie bisher) ─────
+  else
+    info "App wird nach $INSTALL_DIR kopiert (kein git-Repo dort)..."
+    info "(Service-User '$APP_USER' braucht Zugriff — /root ist nicht geeignet)"
+
+    # Daten sichern
+    if [ -d "$INSTALL_DIR/data" ]; then
+      mkdir -p "$BACKUP_DIR"
+      cp -r "$INSTALL_DIR/data" "$BACKUP_DIR/data" 2>/dev/null || true
+      cp -r "$INSTALL_DIR/uploads" "$BACKUP_DIR/uploads" 2>/dev/null || true
+      cp "$INSTALL_DIR/.env" "$BACKUP_DIR/.env" 2>/dev/null || true
+      cp -r "$INSTALL_DIR/backups" "$BACKUP_DIR/backups" 2>/dev/null || true
+      if [ -d "$INSTALL_DIR/public/uploads/logo" ]; then
+        mkdir -p "$BACKUP_DIR/logo"
+        cp -r "$INSTALL_DIR/public/uploads/logo/." "$BACKUP_DIR/logo/" 2>/dev/null || true
+      fi
+      ok "Bestehende Daten aus $INSTALL_DIR gesichert"
     fi
-    ok "Bestehende Daten aus $INSTALL_DIR gesichert"
-  fi
 
-  # Altes Zielverzeichnis aufräumen (Code, nicht Daten)
-  rm -rf "$INSTALL_DIR/node_modules" "$INSTALL_DIR/routes" "$INSTALL_DIR/views" \
-         "$INSTALL_DIR/middleware" "$INSTALL_DIR/cron" "$INSTALL_DIR/public" 2>/dev/null || true
+    # Code-Verzeichnisse aktualisieren (nie data/uploads anfassen!)
+    rm -rf "$INSTALL_DIR/node_modules" "$INSTALL_DIR/routes" "$INSTALL_DIR/views" \
+           "$INSTALL_DIR/middleware" "$INSTALL_DIR/cron" "$INSTALL_DIR/public" 2>/dev/null || true
+    mkdir -p "$INSTALL_DIR"
+    cp -a "$APP_DIR/." "$INSTALL_DIR/"
+    rm -rf "$INSTALL_DIR/node_modules"
 
-  # Neue Dateien kopieren
-  mkdir -p "$INSTALL_DIR"
-  cp -a "$APP_DIR/." "$INSTALL_DIR/"
-  rm -rf "$INSTALL_DIR/node_modules"
-
-  # Gesicherte Daten wiederherstellen
-  if [ -d "$BACKUP_DIR/data" ]; then
-    mkdir -p "$INSTALL_DIR/data" "$INSTALL_DIR/uploads" "$INSTALL_DIR/backups"
-    cp -r "$BACKUP_DIR/data/." "$INSTALL_DIR/data/" 2>/dev/null || true
-    cp -r "$BACKUP_DIR/uploads/." "$INSTALL_DIR/uploads/" 2>/dev/null || true
-    cp "$BACKUP_DIR/.env" "$INSTALL_DIR/.env" 2>/dev/null || true
-    cp -r "$BACKUP_DIR/backups/." "$INSTALL_DIR/backups/" 2>/dev/null || true
-    if [ -d "$BACKUP_DIR/logo" ]; then
-      mkdir -p "$INSTALL_DIR/public/uploads/logo"
-      cp -r "$BACKUP_DIR/logo/." "$INSTALL_DIR/public/uploads/logo/" 2>/dev/null || true
+    # Daten wiederherstellen
+    if [ -d "$BACKUP_DIR/data" ]; then
+      mkdir -p "$INSTALL_DIR/data" "$INSTALL_DIR/uploads" "$INSTALL_DIR/backups"
+      cp -r "$BACKUP_DIR/data/." "$INSTALL_DIR/data/" 2>/dev/null || true
+      cp -r "$BACKUP_DIR/uploads/." "$INSTALL_DIR/uploads/" 2>/dev/null || true
+      cp "$BACKUP_DIR/.env" "$INSTALL_DIR/.env" 2>/dev/null || true
+      cp -r "$BACKUP_DIR/backups/." "$INSTALL_DIR/backups/" 2>/dev/null || true
+      if [ -d "$BACKUP_DIR/logo" ]; then
+        mkdir -p "$INSTALL_DIR/public/uploads/logo"
+        cp -r "$BACKUP_DIR/logo/." "$INSTALL_DIR/public/uploads/logo/" 2>/dev/null || true
+      fi
+      rm -rf "$BACKUP_DIR"
+      ok "Daten wiederhergestellt"
     fi
-    rm -rf "$BACKUP_DIR"
-    ok "Daten wiederhergestellt"
-  fi
 
-  APP_DIR="$INSTALL_DIR"
-  ok "App installiert in $INSTALL_DIR"
-  echo ""
+    APP_DIR="$INSTALL_DIR"
+    ok "App installiert in $INSTALL_DIR"
+    echo ""
+  fi
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -191,26 +210,31 @@ fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════
-# UPDATE: Daten sichern
+# UPDATE: Service stoppen (Datensicherung nur wenn kein git-Repo)
 # ═══════════════════════════════════════════════════════════════════════════
 if $UPDATE_MODE; then
   info "Service stoppen..."
   systemctl stop pdf-freigabe 2>/dev/null || true
   ok "Service gestoppt"
 
-  info "Daten sichern..."
-  mkdir -p "$BACKUP_DIR"
+  # Bei git-Repos: kein Backup nötig (git pull berührt data/ und .env nicht)
+  if [ ! -d "$APP_DIR/.git" ]; then
+    info "Daten sichern..."
+    mkdir -p "$BACKUP_DIR"
 
-  cp -r "$APP_DIR/data" "$BACKUP_DIR/data" 2>/dev/null             && ok "Datenbank gesichert" || true
-  cp -r "$APP_DIR/uploads" "$BACKUP_DIR/uploads" 2>/dev/null       && ok "PDFs gesichert" || true
-  if [ -d "$APP_DIR/public/uploads/logo" ]; then
-    mkdir -p "$BACKUP_DIR/logo"
-    cp -r "$APP_DIR/public/uploads/logo/." "$BACKUP_DIR/logo/" 2>/dev/null && ok "Logo gesichert" || true
+    cp -r "$APP_DIR/data" "$BACKUP_DIR/data" 2>/dev/null             && ok "Datenbank gesichert" || true
+    cp -r "$APP_DIR/uploads" "$BACKUP_DIR/uploads" 2>/dev/null       && ok "PDFs gesichert" || true
+    if [ -d "$APP_DIR/public/uploads/logo" ]; then
+      mkdir -p "$BACKUP_DIR/logo"
+      cp -r "$APP_DIR/public/uploads/logo/." "$BACKUP_DIR/logo/" 2>/dev/null && ok "Logo gesichert" || true
+    fi
+    cp "$APP_DIR/.env" "$BACKUP_DIR/.env" 2>/dev/null                && ok ".env gesichert" || true
+    cp -r "$APP_DIR/backups" "$BACKUP_DIR/backups" 2>/dev/null       && ok "Backup-Archiv gesichert" || true
+    echo ""
+  else
+    ok "git-Repo erkannt – Datensicherung nicht nötig (data/ und .env unberührt)"
+    echo ""
   fi
-  cp "$APP_DIR/.env" "$BACKUP_DIR/.env" 2>/dev/null                && ok ".env gesichert" || true
-  cp -r "$APP_DIR/backups" "$BACKUP_DIR/backups" 2>/dev/null       && ok "Backup-Archiv gesichert" || true
-
-  echo ""
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -283,27 +307,28 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
-# UPDATE: Daten wiederherstellen
+# UPDATE: Daten wiederherstellen (nur wenn kein git-Repo)
 # ═══════════════════════════════════════════════════════════════════════════
 if $UPDATE_MODE; then
-  info "Daten wiederherstellen..."
-
-  mkdir -p "$APP_DIR/data" "$APP_DIR/uploads" "$APP_DIR/backups" "$APP_DIR/public/uploads/logo"
-  cp -r "$BACKUP_DIR/data/." "$APP_DIR/data/" 2>/dev/null               && ok "Datenbank wiederhergestellt" || true
-  cp -r "$BACKUP_DIR/uploads/." "$APP_DIR/uploads/" 2>/dev/null         && ok "PDFs wiederhergestellt" || true
-  cp "$BACKUP_DIR/.env" "$APP_DIR/.env" 2>/dev/null                     && ok ".env wiederhergestellt" || true
-  cp -r "$BACKUP_DIR/backups/." "$APP_DIR/backups/" 2>/dev/null         && ok "Backup-Archiv wiederhergestellt" || true
-  if [ -d "$BACKUP_DIR/logo" ]; then
-    cp -r "$BACKUP_DIR/logo/." "$APP_DIR/public/uploads/logo/" 2>/dev/null && ok "Logo wiederhergestellt" || true
+  if [ ! -d "$APP_DIR/.git" ] && [ -d "$BACKUP_DIR" ]; then
+    info "Daten wiederherstellen..."
+    mkdir -p "$APP_DIR/data" "$APP_DIR/uploads" "$APP_DIR/backups" "$APP_DIR/public/uploads/logo"
+    cp -r "$BACKUP_DIR/data/." "$APP_DIR/data/" 2>/dev/null               && ok "Datenbank wiederhergestellt" || true
+    cp -r "$BACKUP_DIR/uploads/." "$APP_DIR/uploads/" 2>/dev/null         && ok "PDFs wiederhergestellt" || true
+    cp "$BACKUP_DIR/.env" "$APP_DIR/.env" 2>/dev/null                     && ok ".env wiederhergestellt" || true
+    cp -r "$BACKUP_DIR/backups/." "$APP_DIR/backups/" 2>/dev/null         && ok "Backup-Archiv wiederhergestellt" || true
+    if [ -d "$BACKUP_DIR/logo" ]; then
+      cp -r "$BACKUP_DIR/logo/." "$APP_DIR/public/uploads/logo/" 2>/dev/null && ok "Logo wiederhergestellt" || true
+    fi
+    rm -rf "$BACKUP_DIR"
+    ok "Temporäre Sicherung aufgeräumt"
+    echo ""
   fi
 
-  # Migrationen (als Service-User ausführen)
+  # Migrationen ausführen
   info "Datenbank-Migrationen prüfen..."
   cd "$APP_DIR"
-  su -s /bin/sh "$APP_USER" -c "node -e \"require('./database').initialize(); console.log('  ✓ Migrationen erfolgreich');\"" || warn "Migrationen manuell prüfen"
-
-  rm -rf "$BACKUP_DIR"
-  ok "Temporäre Sicherung aufgeräumt"
+  su -s /bin/sh "$APP_USER" -c "node -e \"require('./database').initialize(); console.log('  \u2713 Migrationen erfolgreich');\"" || warn "Migrationen manuell prüfen"
   echo ""
 fi
 
