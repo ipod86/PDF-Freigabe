@@ -373,6 +373,36 @@ router.post('/:token/file/:fileId', (req, res) => {
   res.json({ success: true, status, fileStatus: status, jobComplete, pendingCount: pending });
 });
 
+// ─── Thumbnail Seite 1 für Kunden ───────────────────────────────────────────
+const { getOrCreateThumb } = require('../utils/thumb');
+
+router.get('/:token/thumb', (req, res) => {
+  const db  = getDb();
+  const job = db.prepare('SELECT * FROM jobs WHERE access_token = ?').get(req.params.token);
+  if (!job) return res.status(404).send('Nicht gefunden');
+  const file = db.prepare('SELECT * FROM job_versions WHERE job_id = ? AND version_number = ?').get(job.id, job.current_version);
+  if (!file) return res.status(404).send('Datei nicht gefunden');
+  const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
+  const jpg = getOrCreateThumb(file.stored_name);
+  if (!jpg) return res.status(404).send('Kein Thumbnail');
+  res.setHeader('Content-Type', 'image/jpeg');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  fs.createReadStream(jpg).pipe(res);
+});
+
+router.get('/:token/file/:fileId/thumb', (req, res) => {
+  const db  = getDb();
+  const job = db.prepare('SELECT * FROM jobs WHERE access_token = ?').get(req.params.token);
+  if (!job) return res.status(404).send('Nicht gefunden');
+  const file = db.prepare('SELECT * FROM job_files WHERE id = ? AND job_id = ?').get(parseInt(req.params.fileId), job.id);
+  if (!file) return res.status(404).send('Datei nicht gefunden');
+  const jpg = getOrCreateThumb(file.stored_name);
+  if (!jpg) return res.status(404).send('Kein Thumbnail');
+  res.setHeader('Content-Type', 'image/jpeg');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  fs.createReadStream(jpg).pipe(res);
+});
+
 // ─── Einzeldatei-Vorschau für Kunden ────────────────────────────────────────
 router.get('/:token/file/:fileId/preview', (req, res) => {
   const db = getDb();

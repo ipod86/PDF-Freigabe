@@ -244,7 +244,7 @@ fi
 # ─── System-Pakete ───────────────────────────────────────────────────────────
 info "System-Pakete aktualisieren..."
 apt-get update -qq
-apt-get install -y -qq curl build-essential python3 tar gzip ca-certificates gnupg
+apt-get install -y -qq curl build-essential python3 tar gzip ca-certificates gnupg poppler-utils
 ok "System-Pakete aktuell"
 
 # ─── Service-Benutzer ────────────────────────────────────────────────────────

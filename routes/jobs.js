@@ -438,6 +438,35 @@ router.get('/:uuid/download{/:version}', requireLogin, (req, res) => {
   res.download(filePath, downloadName);
 });
 
+// ─── Thumbnail Seite 1 (intern) ─────────────────────────────────────────────
+const { getOrCreateThumb } = require('../utils/thumb');
+
+router.get('/:uuid/thumb', requireLogin, (req, res) => {
+  const db  = getDb();
+  const job = db.prepare('SELECT * FROM jobs WHERE uuid = ?').get(req.params.uuid);
+  if (!job) return res.status(404).send('Nicht gefunden');
+  const file = db.prepare('SELECT * FROM job_versions WHERE job_id = ? AND version_number = ?').get(job.id, job.current_version);
+  if (!file) return res.status(404).send('Datei nicht gefunden');
+  const jpg = getOrCreateThumb(file.stored_name);
+  if (!jpg) return res.status(404).send('Kein Thumbnail');
+  res.setHeader('Content-Type', 'image/jpeg');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  fs.createReadStream(jpg).pipe(res);
+});
+
+router.get('/:uuid/file/:fileId/thumb', requireLogin, (req, res) => {
+  const db  = getDb();
+  const job = db.prepare('SELECT * FROM jobs WHERE uuid = ?').get(req.params.uuid);
+  if (!job) return res.status(404).send('Nicht gefunden');
+  const file = db.prepare('SELECT * FROM job_files WHERE id = ? AND job_id = ?').get(parseInt(req.params.fileId), job.id);
+  if (!file) return res.status(404).send('Datei nicht gefunden');
+  const jpg = getOrCreateThumb(file.stored_name);
+  if (!jpg) return res.status(404).send('Kein Thumbnail');
+  res.setHeader('Content-Type', 'image/jpeg');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  fs.createReadStream(jpg).pipe(res);
+});
+
 // ─── PDF-Vorschau (für PDF.js) ──────────────────────────────────────────────
 router.get('/:uuid/preview{/:version}', requireLogin, (req, res) => {
   const db = getDb();
