@@ -61,6 +61,7 @@ function generateProtocol(jobId, outputStream) {
   // ─── PDF erstellen ──────────────────────────────────────────────────────
   const doc = new PDFDocument({
     size: 'A4',
+    bufferPages: true,
     margins: { top: 60, bottom: 60, left: 50, right: 50 },
     info: {
       Title: `Freigabeprotokoll: ${job.job_name}`,
