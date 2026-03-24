@@ -15,9 +15,17 @@ const db = getDb();
 console.log('🌱 Initialdaten werden angelegt...\n');
 
 // ─── Admin-Sachbearbeiter ────────────────────────────────────────────────────
-const password = crypto.randomBytes(5).toString('hex'); // 10-stelliges Hex-Passwort
-const hash     = bcrypt.hashSync(password, 10);
-const email    = 'admin@firma.de';
+// Credentials aus /tmp/pf-admin-init lesen (vom setup.sh geschrieben)
+// Fallback: zufälliges Passwort falls direkt aufgerufen
+let email    = 'admin@firma.de';
+let password = crypto.randomBytes(5).toString('hex');
+const credsFile = '/tmp/pf-admin-init';
+if (fs.existsSync(credsFile)) {
+  const lines = fs.readFileSync(credsFile, 'utf8').trim().split('\n');
+  if (lines[0]) email    = lines[0].trim();
+  if (lines[1]) password = lines[1].trim();
+}
+const hash = bcrypt.hashSync(password, 10);
 
 db.prepare(`
   INSERT OR IGNORE INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)
