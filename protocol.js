@@ -271,12 +271,13 @@ function generateProtocol(jobId, outputStream) {
 
   // ─── Fußzeile auf jeder Seite ───────────────────────────────────────────
   const range = doc.bufferedPageRange();
-  for (let i = range.start; i < range.start + range.count; i++) {
+  const totalPages = range.count;
+  for (let i = range.start; i < range.start + totalPages; i++) {
     doc.switchToPage(i);
     doc.fontSize(7).font('Helvetica').fillColor(grayColor);
     doc.text(
-      `Freigabeprotokoll: ${job.job_name} · Seite ${i + 1} von ${range.count} · ${companyName}`,
-      50, 780, { width: 495, align: 'center' }
+      `Freigabeprotokoll: ${job.job_name} · Seite ${i - range.start + 1} von ${totalPages} · ${companyName}`,
+      50, 770, { width: 495, align: 'center', lineBreak: false }
     );
   }
 
