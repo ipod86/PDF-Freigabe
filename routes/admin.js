@@ -528,42 +528,17 @@ router.post('/update', adminOnly, (req, res) => {
   const log = (msg) => { try { fs.appendFileSync(logFile, msg + '\n'); } catch(_) {} };
   log(`\n\n=== Update gestartet: ${new Date().toISOString()} ===`);
 
-  const tmpZip = `/tmp/pdf-update-${process.pid}.zip`;
-  const tmpDir = `/tmp/pdf-update-${process.pid}`;
-  const zipUrl = 'https://github.com/ipod86/PDF-Freigabe/archive/refs/heads/main.zip';
-
-  let success = false;
-  try {
-    try { execSync('which rsync', { timeout: 5000 }); }
-    catch(_) { log('▸ rsync installieren...'); execSync('apt-get install -y rsync -qq', { timeout: 60000 }); }
-
-    log('▸ Herunterladen...');
-    execSync(`wget -q -O "${tmpZip}" "${zipUrl}"`, { timeout: 60000 });
-
-    log('▸ Entpacken...');
-    execSync(`mkdir -p "${tmpDir}" && unzip -q "${tmpZip}" -d "${tmpDir}"`, { timeout: 30000 });
-
-    log('▸ Dateien kopieren...');
-    execSync(
-      `rsync -a --delete --exclude=uploads/ --exclude=*.db --exclude=*.sqlite --exclude=.env --exclude=update.log --exclude=node_modules/ "${tmpDir}/PDF-Freigabe-main/" "${appDir}/"`,
-      { timeout: 30000 }
-    );
-
-    log('▸ Abhängigkeiten installieren...');
-    execSync(`npm install --omit=dev 2>&1`, { cwd: appDir, timeout: 120000 });
-
-    log('=== Update erfolgreich ===');
-    success = true;
-  } catch(e) {
-    log(`FEHLER: ${e.stderr ? e.stderr.toString() : e.message}`);
-  } finally {
-    try { execSync(`rm -rf "${tmpZip}" "${tmpDir}"`); } catch(_) {}
-  }
-
-  if (success) {
-    log('▸ Neustart...');
-    setTimeout(() => process.exit(0), 500);
-  }
+  // Setup-Script kümmert sich um Backup, Dateien kopieren, npm install und Neustart
+  const setupScript = path.join(appDir, 'setup.sh');
+  const { spawn } = require('child_process');
+  const child = spawn('sudo', [setupScript, '--update'], {
+    detached: true,
+    stdio: ['ignore', fs.openSync(logFile, 'a'), fs.openSync(logFile, 'a')],
+    cwd: appDir,
+  });
+  child.unref();
+  // Prozess beenden — setup.sh startet den Service neu
+  setTimeout(() => process.exit(0), 500);
 });
 
 router.get('/update-log', adminOnly, (req, res) => {

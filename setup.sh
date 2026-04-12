@@ -465,6 +465,15 @@ EOF
 
 systemctl daemon-reload
 systemctl enable --now pdf-freigabe-cron.timer
+
+# ─── Sudoers-Regel für In-App-Update ────────────────────────────────────────
+SUDOERS_FILE="/etc/sudoers.d/pdf-freigabe"
+cat > "$SUDOERS_FILE" << EOF
+# Erlaubt dem pdf-freigabe-Service setup.sh --update ohne Passwort auszuführen
+$APP_USER ALL=(root) NOPASSWD: $INSTALL_DIR/setup.sh --update
+EOF
+chmod 440 "$SUDOERS_FILE"
+ok "Sudo-Regel für In-App-Update eingerichtet"
 if systemctl is-active --quiet pdf-freigabe-cron.timer 2>/dev/null; then
   ok "Erinnerungen-Timer eingerichtet (alle 2h, 7–17 Uhr)"
 else
