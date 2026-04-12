@@ -1,6 +1,6 @@
 {
   "name": "pdf-freigabe",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "description": "Webbasiertes PDF-Freigabetool",
   "main": "server.js",
   "engines": {
