@@ -562,7 +562,8 @@ router.post('/update', adminOnly, (req, res) => {
 
   if (success) {
     log('▸ Neustart...');
-    setTimeout(() => process.exit(0), 500);
+    // Exit code 1 triggers Restart=on-failure AND Restart=always
+    setTimeout(() => process.exit(1), 500);
   }
 });
 
