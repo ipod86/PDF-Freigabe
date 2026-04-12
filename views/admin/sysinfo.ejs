@@ -159,21 +159,48 @@ async function checkNpmOutdated() {
 
 async function doUpdate() {
   if (!confirm('Update installieren und App neu starten?')) return;
+  const btn = document.getElementById('do-update-btn');
   const logBox = document.getElementById('update-log-box');
-  logBox.style.display = ''; logBox.textContent = 'Update läuft…';
-  try {
-    await fetch('/admin/update', { method: 'POST' });
-    let polls = 0;
+  btn.disabled = true;
+  btn.textContent = '⏳ Herunterladen...';
+  logBox.style.display = ''; logBox.textContent = '';
+
+  try { await fetch('/admin/update', { method: 'POST' }); }
+  catch(e) { logBox.textContent = 'Fehler: ' + e.message; btn.disabled = false; btn.textContent = 'Update installieren'; return; }
+
+  let lastLog = '', serverGone = false;
+  const steps = ['⏳ Herunterladen...','📦 Entpacken...','📁 Kopieren...','🔧 Abhängigkeiten...','🔄 Neustart...'];
+  let stepIdx = 0;
+  const stepIv = setInterval(() => { stepIdx = Math.min(stepIdx+1, steps.length-1); btn.textContent = steps[stepIdx]; }, 4000);
+
+  const pollIv = setInterval(async () => {
+    try {
+      const d = await (await fetch('/admin/update-log')).json();
+      if (d.log !== lastLog) { lastLog = d.log; logBox.textContent = d.log; logBox.scrollTop = logBox.scrollHeight; }
+      if (d.log.includes('=== Update erfolgreich ===') && !serverGone) {
+        serverGone = true; clearInterval(pollIv); clearInterval(stepIv);
+        btn.textContent = '🔄 Neustart läuft...'; waitForRestart();
+      }
+    } catch(_) {
+      if (!serverGone) { serverGone = true; clearInterval(pollIv); clearInterval(stepIv); btn.textContent = '🔄 Neustart läuft...'; waitForRestart(); }
+    }
+  }, 2000);
+
+  function waitForRestart() {
+    logBox.textContent = (lastLog||'') + '\n▸ Warte auf Neustart...';
+    let tries = 0;
     const iv = setInterval(async () => {
+      tries++;
       try {
-        const r = await fetch('/admin/update-log');
-        const d = await r.json();
-        logBox.textContent = d.log || '';
-        logBox.scrollTop = logBox.scrollHeight;
-        if (++polls > 30) clearInterval(iv);
-      } catch(e) { clearInterval(iv); }
+        await fetch(window.location.origin + '/admin/latest-version');
+        clearInterval(iv);
+        btn.textContent = '✓ Update abgeschlossen';
+        logBox.textContent = (lastLog||'') + '\n✓ Server läuft wieder.';
+        alert('Update erfolgreich – Seite wird neu geladen.');
+        window.location.reload();
+      } catch(_) { if (tries > 60) { clearInterval(iv); btn.disabled = false; btn.textContent = 'Update installieren'; } }
     }, 2000);
-  } catch(e) { logBox.textContent = 'Fehler: ' + e.message; }
+  }
 }
 
 checkGhVersion();

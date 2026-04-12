@@ -277,8 +277,8 @@ fi
 
 # ─── Verzeichnisse ───────────────────────────────────────────────────────────
 mkdir -p "$APP_DIR"/{data,uploads,backups,public/fonts,public/vendor,public/uploads/logo}
-# Service-User muss in Daten-Verzeichnisse schreiben können
-chown "$APP_USER:$APP_USER" "$APP_DIR/data" "$APP_DIR/uploads" "$APP_DIR/backups" "$APP_DIR/public/uploads" "$APP_DIR/public/uploads/logo"
+# App-Verzeichnis gehört dem Service-User (Updates ohne sudo möglich)
+chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 
 # ─── Fonts & Assets ─────────────────────────────────────────────────────────
 info "Lokale Fonts und JS-Bibliotheken herunterladen..."
@@ -398,7 +398,7 @@ User=$APP_USER
 Group=$APP_USER
 WorkingDirectory=$APP_DIR
 ExecStart=$(which node) server.js
-Restart=on-failure
+Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
@@ -410,8 +410,7 @@ Environment=NODE_ENV=production
 Environment=PORT=3000
 
 # Security Hardening
-NoNewPrivileges=true
-PrivateTmp=true
+PrivateTmp=false
 ProtectSystem=strict
 ProtectHome=true
 ProtectKernelTunables=true
@@ -419,7 +418,7 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 RestrictNamespaces=true
-ReadWritePaths=$APP_DIR/data $APP_DIR/uploads $APP_DIR/backups $APP_DIR/public/uploads
+ReadWritePaths=$APP_DIR /tmp
 
 [Install]
 WantedBy=multi-user.target
