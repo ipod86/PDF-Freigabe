@@ -42,6 +42,7 @@ if [ "$APP_DIR" != "$INSTALL_DIR" ]; then
   # ─── Weg 1: /opt ist bereits ein git-Repo → git pull ─────────────────────
   if [ -d "$INSTALL_DIR/.git" ]; then
     info "Git-Repo in $INSTALL_DIR gefunden → git pull..."
+    git -C "$INSTALL_DIR" reset --hard HEAD
     git -C "$INSTALL_DIR" pull
     ok "Code aktualisiert via git pull"
     APP_DIR="$INSTALL_DIR"
