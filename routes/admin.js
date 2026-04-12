@@ -521,50 +521,51 @@ router.get('/sysinfo', adminOnly, (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 router.post('/update', adminOnly, (req, res) => {
+  const { spawn } = require('child_process');
   const appDir = path.join(__dirname, '..');
   const logFile = path.join(appDir, 'update.log');
+  const zipUrl  = 'https://github.com/ipod86/PDF-Freigabe/archive/refs/heads/master.zip';
+  const tmpZip  = `/tmp/pdf-update-${process.pid}.zip`;
+  const tmpDir  = `/tmp/pdf-update-${process.pid}`;
+
   res.json({ ok: true });
 
   const log = (msg) => { try { fs.appendFileSync(logFile, msg + '\n'); } catch(_) {} };
   log(`\n\n=== Update gestartet: ${new Date().toISOString()} ===`);
 
-  const tmpZip = `/tmp/pdf-update-${process.pid}.zip`;
-  const tmpDir = `/tmp/pdf-update-${process.pid}`;
-  const zipUrl = 'https://github.com/ipod86/PDF-Freigabe/archive/refs/heads/master.zip';
+  // Hintergrund-Script: Node bleibt reaktionsfähig für Log-Polls
+  const script = `
+set -e
+command -v rsync >/dev/null || apt-get install -y rsync -qq
+echo "▸ Herunterladen..." >> "${logFile}"
+wget -q -O "${tmpZip}" "${zipUrl}"
+echo "▸ Entpacken..." >> "${logFile}"
+mkdir -p "${tmpDir}" && unzip -q "${tmpZip}" -d "${tmpDir}"
+echo "▸ Dateien kopieren..." >> "${logFile}"
+rsync -a --exclude=data/ --exclude=uploads/ --exclude=backups/ --exclude=.env --exclude=update.log --exclude=node_modules/ "${tmpDir}/PDF-Freigabe-master/" "${appDir}/"
+echo "▸ Abhängigkeiten installieren..." >> "${logFile}"
+cd "${appDir}" && npm install --omit=dev >> "${logFile}" 2>&1
+rm -rf "${tmpZip}" "${tmpDir}"
+echo "=== Update erfolgreich ===" >> "${logFile}"
+`;
 
-  let success = false;
-  try {
-    try { execSync('which rsync', { timeout: 5000 }); }
-    catch(_) { log('▸ rsync installieren...'); execSync('apt-get install -y rsync -qq', { timeout: 60000 }); }
+  const child = spawn('bash', ['-c', script], { detached: true, stdio: 'ignore' });
+  child.unref();
 
-    log('▸ Herunterladen...');
-    execSync(`wget -q -O "${tmpZip}" "${zipUrl}"`, { timeout: 60000 });
-
-    log('▸ Entpacken...');
-    execSync(`mkdir -p "${tmpDir}" && unzip -q "${tmpZip}" -d "${tmpDir}"`, { timeout: 30000 });
-
-    log('▸ Dateien kopieren...');
-    execSync(
-      `rsync -a --exclude=data/ --exclude=uploads/ --exclude=backups/ --exclude=.env --exclude=update.log --exclude=node_modules/ "${tmpDir}/PDF-Freigabe-master/" "${appDir}/"`,
-      { timeout: 30000 }
-    );
-
-    log('▸ Abhängigkeiten installieren...');
-    execSync(`npm install --omit=dev 2>&1`, { cwd: appDir, timeout: 120000 });
-
-    log('=== Update erfolgreich ===');
-    success = true;
-  } catch(e) {
-    log(`FEHLER: ${e.stderr ? e.stderr.toString() : e.message}`);
-  } finally {
-    try { execSync(`rm -rf "${tmpZip}" "${tmpDir}"`); } catch(_) {}
-  }
-
-  if (success) {
-    log('▸ Neustart...');
-    // Exit code 1 triggers Restart=on-failure AND Restart=always
-    setTimeout(() => process.exit(1), 500);
-  }
+  // Warte auf "=== Update erfolgreich ===" dann neu starten
+  let waited = 0;
+  const check = setInterval(() => {
+    waited += 2000;
+    try {
+      const content = fs.readFileSync(logFile, 'utf8');
+      if (content.includes('=== Update erfolgreich ===')) {
+        clearInterval(check);
+        log('▸ Neustart...');
+        setTimeout(() => process.exit(1), 500);
+      }
+    } catch(_) {}
+    if (waited > 180000) { clearInterval(check); log('FEHLER: Timeout'); }
+  }, 2000);
 });
 
 router.get('/update-log', adminOnly, (req, res) => {
