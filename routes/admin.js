@@ -443,7 +443,19 @@ router.post('/backup/restore', adminOnly, backupUpload.single('backup'), (req, r
     execSync(`rm -rf "${tmpDir}"`);
     fs.unlinkSync(req.file.path);
 
-    req.session.flash = { type: 'success', text: 'Backup wiederhergestellt! Datenbank und Dateien wurden ersetzt.' };
+    req.session.flash = { type: 'success', text: 'Backup wiederhergestellt! App wird neu gestartet…' };
+    res.redirect('/admin/backup');
+    // Neustart nach Restore
+    const { spawn } = require('child_process');
+    const appDir = path.join(__dirname, '..');
+    const child = spawn(process.execPath, [path.join(appDir, 'server.js')], {
+      detached: true,
+      stdio: 'ignore',
+      cwd: appDir, env: process.env,
+    });
+    child.unref();
+    setTimeout(() => process.exit(0), 800);
+    return;
   } catch (err) {
     console.error('[RESTORE] Fehler:', err);
     req.session.flash = { type: 'error', text: 'Fehler: ' + err.message };
