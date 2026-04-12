@@ -505,6 +505,67 @@ router.get('/sysinfo', adminOnly, (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// UPDATE / NPM-OUTDATED
+// ═══════════════════════════════════════════════════════════════════════════
+
+router.post('/update', adminOnly, (req, res) => {
+  const { exec } = require('child_process');
+  const appDir = path.join(__dirname, '..');
+  const logFile = path.join(appDir, 'update.log');
+  res.json({ ok: true });
+  const ts = new Date().toISOString();
+  const log = fs.createWriteStream(logFile, { flags: 'a' });
+  log.write(`\n\n=== Update gestartet: ${ts} ===\n`);
+  exec(`cd "${appDir}" && git pull origin main 2>&1 && npm install --production 2>&1`, (err, stdout) => {
+    log.write((stdout || '') + '\n');
+    if (err) { log.write(`FEHLER: ${err.message}\n`); log.end(); return; }
+    log.write('=== Update erfolgreich, starte neu... ===\n');
+    log.end();
+    const { spawn } = require('child_process');
+    const child = spawn(process.execPath, [path.join(appDir, 'server.js')], {
+      detached: true,
+      stdio: ['ignore', fs.openSync(logFile, 'a'), fs.openSync(logFile, 'a')],
+      cwd: appDir, env: process.env,
+    });
+    child.unref();
+    setTimeout(() => process.exit(0), 500);
+  });
+});
+
+router.get('/update-log', adminOnly, (req, res) => {
+  const logFile = path.join(__dirname, '..', 'update.log');
+  try { res.json({ log: fs.readFileSync(logFile, 'utf8').slice(-10000) }); }
+  catch(e) { res.json({ log: 'Kein Log vorhanden.' }); }
+});
+
+router.get('/npm-outdated', adminOnly, (req, res) => {
+  const appDir = path.join(__dirname, '..');
+  try {
+    const out = execSync('npm outdated --json 2>/dev/null || true', { cwd: appDir, encoding: 'utf8', timeout: 30000 });
+    let data = {};
+    try { data = JSON.parse(out || '{}'); } catch(e) {}
+    res.json({ packages: Object.entries(data).map(([name, i]) => ({ name, current: i.current||'?', wanted: i.wanted||'?', latest: i.latest||'?' })) });
+  } catch(e) { res.json({ packages: [], error: e.message }); }
+});
+
+router.get('/latest-version', adminOnly, async (req, res) => {
+  try {
+    const https = require('https');
+    const data = await new Promise((resolve, reject) => {
+      const r = https.get('https://api.github.com/repos/ipod86/PDF-Freigabe/releases/latest',
+        { headers: { 'User-Agent': 'pdf-freigabe' } }, (resp) => {
+          let body = '';
+          resp.on('data', d => body += d);
+          resp.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { reject(e); } });
+        });
+      r.on('error', reject);
+      r.setTimeout(5000, () => { r.destroy(); reject(new Error('timeout')); });
+    });
+    res.json({ tag_name: data.tag_name || null });
+  } catch(e) { res.json({ tag_name: null, error: e.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // JOB-VORLAGEN
 // ═══════════════════════════════════════════════════════════════════════════
 router.get('/job-templates', (req, res) => {

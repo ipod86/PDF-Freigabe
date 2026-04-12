@@ -77,7 +77,11 @@
 
   <!-- Abhängigkeiten -->
   <div class="card">
-    <h3>Node.js-Module</h3>
+    <h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      Node.js-Module
+      <button class="btn btn-sm btn-outline" id="npm-outdated-btn" onclick="checkNpmOutdated()">Auf Updates prüfen</button>
+    </h3>
+    <div id="npm-outdated-result" style="margin-bottom:8px"></div>
     <div style="max-height:200px;overflow-y:auto;">
       <% sysinfo.deps.forEach(d => { %>
       <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);font-size:0.82rem;">
@@ -87,7 +91,93 @@
       <% }) %>
     </div>
   </div>
+
+  <!-- Update -->
+  <div class="card" style="grid-column:1/-1">
+    <h3>Software-Update</h3>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+      <span style="font-size:0.9rem">Installierte Version: <code><%= sysinfo.appVersion %></code></span>
+      <span id="gh-version-badge" style="font-size:0.8rem;color:var(--text-muted)">Prüfe GitHub…</span>
+      <button class="btn btn-sm btn-outline" onclick="checkGhVersion()">Versionscheck</button>
+      <button class="btn btn-sm btn-primary" id="do-update-btn" onclick="doUpdate()">Update installieren</button>
+    </div>
+    <pre id="update-log-box" style="display:none;background:#1a1a1a;color:#ddd;padding:12px;border-radius:6px;font-size:11px;max-height:300px;overflow-y:auto;white-space:pre-wrap"></pre>
+  </div>
 </div>
+
+<script>
+async function checkGhVersion() {
+  const badge = document.getElementById('gh-version-badge');
+  badge.textContent = 'Prüfe…';
+  try {
+    const r = await fetch('/admin/latest-version');
+    const d = await r.json();
+    if (d.tag_name) {
+      const current = 'v<%= sysinfo.appVersion %>';
+      if (d.tag_name === current) {
+        badge.textContent = `Aktuell (${d.tag_name})`;
+        badge.style.color = 'var(--green)';
+      } else {
+        badge.textContent = `Neue Version: ${d.tag_name}`;
+        badge.style.color = 'var(--orange)';
+      }
+    } else {
+      badge.textContent = 'GitHub nicht erreichbar';
+      badge.style.color = 'var(--text-muted)';
+    }
+  } catch(e) {
+    badge.textContent = 'Fehler bei Prüfung';
+  }
+}
+
+async function checkNpmOutdated() {
+  const btn = document.getElementById('npm-outdated-btn');
+  const box = document.getElementById('npm-outdated-result');
+  btn.disabled = true; btn.textContent = 'Prüfe…';
+  box.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">npm outdated wird ausgeführt…</span>';
+  try {
+    const r = await fetch('/admin/npm-outdated');
+    const d = await r.json();
+    btn.disabled = false; btn.textContent = 'Auf Updates prüfen';
+    if (!d.packages || d.packages.length === 0) {
+      box.innerHTML = '<div style="font-size:12px;color:var(--green);padding:4px 0">Alle Pakete sind aktuell.</div>';
+      return;
+    }
+    box.innerHTML = `<table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:6px">
+      <thead><tr style="text-align:left"><th style="padding:3px 8px">Paket</th><th>Installiert</th><th>Gewünscht</th><th style="color:var(--orange)">Neueste</th></tr></thead>
+      <tbody>${d.packages.map(p => `<tr>
+        <td style="padding:3px 8px"><code>${p.name}</code></td>
+        <td>${p.current}</td><td>${p.wanted}</td>
+        <td style="font-weight:600;color:var(--orange)">${p.latest}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Auf Updates prüfen';
+    box.innerHTML = `<span style="font-size:12px;color:var(--red)">Fehler: ${e.message}</span>`;
+  }
+}
+
+async function doUpdate() {
+  if (!confirm('Update installieren und App neu starten?')) return;
+  const logBox = document.getElementById('update-log-box');
+  logBox.style.display = ''; logBox.textContent = 'Update läuft…';
+  try {
+    await fetch('/admin/update', { method: 'POST' });
+    let polls = 0;
+    const iv = setInterval(async () => {
+      try {
+        const r = await fetch('/admin/update-log');
+        const d = await r.json();
+        logBox.textContent = d.log || '';
+        logBox.scrollTop = logBox.scrollHeight;
+        if (++polls > 30) clearInterval(iv);
+      } catch(e) { clearInterval(iv); }
+    }, 2000);
+  } catch(e) { logBox.textContent = 'Fehler: ' + e.message; }
+}
+
+checkGhVersion();
+</script>
 
 <style>
 .sysinfo-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
