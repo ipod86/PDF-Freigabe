@@ -530,26 +530,28 @@ router.post('/update', adminOnly, (req, res) => {
 
   res.json({ ok: true });
 
-  const log = (msg) => { try { fs.appendFileSync(logFile, msg + '\n'); } catch(_) {} };
+  const log = (msg) => {
+    try { fs.appendFileSync(logFile, msg + '\n'); }
+    catch(e) { console.error('[UPDATE] log write failed:', e.message, '| logFile:', logFile); }
+  };
   log(`\n\n=== Update gestartet: ${new Date().toISOString()} ===`);
 
   // Hintergrund-Script: Node bleibt reaktionsfähig für Log-Polls
   const script = `
-set -e
-command -v rsync >/dev/null || apt-get install -y rsync -qq
-echo "▸ Herunterladen..." >> "${logFile}"
-wget -q -O "${tmpZip}" "${zipUrl}"
+command -v rsync >/dev/null 2>&1 || apt-get install -y rsync -qq
+echo "▸ Herunterladen..." >> "${logFile}" 2>&1 || true
+wget -q -O "${tmpZip}" "${zipUrl}" || { echo "FEHLER: wget gescheitert" >> "${logFile}"; exit 1; }
 echo "▸ Entpacken..." >> "${logFile}"
-mkdir -p "${tmpDir}" && unzip -q "${tmpZip}" -d "${tmpDir}"
+mkdir -p "${tmpDir}" && unzip -q "${tmpZip}" -d "${tmpDir}" || { echo "FEHLER: unzip gescheitert" >> "${logFile}"; exit 1; }
 echo "▸ Dateien kopieren..." >> "${logFile}"
-rsync -a --exclude=data/ --exclude=uploads/ --exclude=backups/ --exclude=.env --exclude=update.log --exclude=node_modules/ "${tmpDir}/PDF-Freigabe-master/" "${appDir}/"
+rsync -a --exclude=data/ --exclude=uploads/ --exclude=backups/ --exclude=.env --exclude=update.log --exclude=node_modules/ "${tmpDir}/PDF-Freigabe-master/" "${appDir}/" || { echo "FEHLER: rsync gescheitert" >> "${logFile}"; exit 1; }
 echo "▸ Abhängigkeiten installieren..." >> "${logFile}"
 cd "${appDir}" && npm install --omit=dev >> "${logFile}" 2>&1
 rm -rf "${tmpZip}" "${tmpDir}"
 echo "=== Update erfolgreich ===" >> "${logFile}"
 `;
 
-  const child = spawn('bash', ['-c', script], { detached: true, stdio: 'ignore' });
+  const child = spawn('bash', ['-c', script], { detached: true, stdio: ['ignore', 'inherit', 'inherit'] });
   child.unref();
 
   // Warte auf "=== Update erfolgreich ===" dann neu starten
