@@ -165,7 +165,8 @@ async function doUpdate() {
   btn.textContent = '⏳ Herunterladen...';
   logBox.style.display = ''; logBox.textContent = '';
 
-  try { await fetch('/admin/update', { method: 'POST' }); }
+  const csrfToken = document.cookie.split('; ').find(r => r.startsWith('csrf-token='))?.split('=')[1] || '';
+  try { await fetch('/admin/update', { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } }); }
   catch(e) { logBox.textContent = 'Fehler: ' + e.message; btn.disabled = false; btn.textContent = 'Update installieren'; return; }
 
   let lastLog = '', serverGone = false;
