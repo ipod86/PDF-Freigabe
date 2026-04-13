@@ -374,19 +374,20 @@ fi
 # GEMEINSAM: Berechtigungen + Service
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Code-Verzeichnis: root besitzt, Service-User kann lesen
-chown -R root:root "$APP_DIR"
+# App-Verzeichnis gehört dem Service-User (für In-App-Updates + update.log)
+chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 chmod -R 755 "$APP_DIR"
-
-# Schreibbare Verzeichnisse: Service-User besitzt
-chown -R "$APP_USER:$APP_USER" "$APP_DIR/data" "$APP_DIR/uploads" "$APP_DIR/backups" "$APP_DIR/public/uploads"
 chmod -R 750 "$APP_DIR/data" "$APP_DIR/uploads" "$APP_DIR/backups"
 
-# .env: nur root + Service-User lesbar
+# .env: nur Service-User lesbar
 if [ -f "$APP_DIR/.env" ]; then
-  chown root:"$APP_USER" "$APP_DIR/.env"
+  chown "$APP_USER:$APP_USER" "$APP_DIR/.env"
   chmod 640 "$APP_DIR/.env"
 fi
+
+# update.log anlegen damit ReadWritePaths greift
+touch "$APP_DIR/update.log"
+chown "$APP_USER:$APP_USER" "$APP_DIR/update.log"
 
 cat > /etc/systemd/system/pdf-freigabe.service << EOF
 [Unit]
